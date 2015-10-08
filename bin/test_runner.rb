@@ -6,17 +6,21 @@ require 'tco'
 require 'pry'
 require 'pry-byebug'
 
-$file_location = "/root/.test_runner/todo.txt"
+runner_options = YAML.load_file("./config/options.yaml")
+@@file_location = runner_options[:todo_file_location]
+@@launched      = runner_options[:launched] 
+@@launch_limit  = runner_options[:launch_limit] 
+@@threshold     = runner_options[:threshold] 
+@@cloud         = runner_options[:cloud]
+
 client_opts = YAML.load_file(File.expand_path("~/.jenkins_api_client/login.yml"))
 @@client = JenkinsApi::Client.new(client_opts)
 @@api_client = RightApi::Client.new(YAML.load_file(File.expand_path('~/.right_api_client/login_test_runner.yml', __FILE__)))
 #@@api_client.log = -1 
 raise "Unable to instanciate right api client, please check config file" if @@api_client.nil?
-@@launched = 0
-@@launch_limit = 5
-@@threshold =  10 
-@@cloud = "rl10lin"
-#binding.pry; exit
+
+
+
 class Test
   attr_accessor :todo_string, :stage_id, :stage, :name, :status, :next, :opts
   extend Forwardable
@@ -215,7 +219,14 @@ class Done < BaseStage
 end
 
 def check_todo_list
-  todo_list = File.readlines($file_location)
+  raise "File location for todo list is nil" if @@file_location.nil?
+  puts "Loading #{@@file_location}"
+  begin
+    todo_list = File.readlines(@@file_location)
+  rescue
+    puts "File not found: #{@@file_location}"
+    exit
+  end
   tests = []
   todo_list.each do |item|
     next if (0 == (item =~ /\s+/)) # skip on empty lines
@@ -241,7 +252,7 @@ while true
   end
   
   # save updated todo list
-  File.open($file_location, 'w') do |file|
+  File.open(@@file_location, 'w') do |file|
     tests.each do |test|
       file.puts test.get_line
     end

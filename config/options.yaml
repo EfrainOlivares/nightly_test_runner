@@ -1,0 +1,7 @@
+---
+:todo_file_location: "/root/.test_runner/todo.txt"
+:launched: 0
+:launch_limit: 5
+:threshold: 10
+:cloud: "rl10win"
+
