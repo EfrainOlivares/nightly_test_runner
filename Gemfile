@@ -1,3 +1,6 @@
 source 'https://rubygems.org'
 gem 'jenkins_api_client'
 gem 'right_api_client'
+gem 'pry'
+gem 'pry-byebug'
+gem 'tco'

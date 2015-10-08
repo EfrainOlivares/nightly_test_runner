@@ -2,7 +2,7 @@
 require 'yaml'
 require 'jenkins_api_client'
 require 'pry'
-require 'pry-debugger'
+require 'pry-byebug'
 require 'tco'
 
 @client_opts = YAML.load_file(File.expand_path("~/.jenkins_api_client/login.yml"))
