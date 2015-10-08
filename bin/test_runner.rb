@@ -6,6 +6,10 @@ require 'tco'
 require 'pry'
 require 'pry-byebug'
 
+
+###############################################################################
+# Pick up config files and init befroe starting
+
 runner_options = YAML.load_file("./config/options.yaml")
 @@file_location = runner_options[:todo_file_location]
 @@launched      = runner_options[:launched] 
@@ -13,13 +17,17 @@ runner_options = YAML.load_file("./config/options.yaml")
 @@threshold     = runner_options[:threshold] 
 @@cloud         = runner_options[:cloud]
 
-client_opts = YAML.load_file(File.expand_path("~/.jenkins_api_client/login.yml"))
-@@client = JenkinsApi::Client.new(client_opts)
+# Jenkins api client
+@@client = JenkinsApi::Client.new(YAML.load_file(File.expand_path("~/.jenkins_api_client/login.yml")))
+raise "Unable to instantiate jenkins_api_client, please check config file" if @@client.nil?
+
+# right_api_client
 @@api_client = RightApi::Client.new(YAML.load_file(File.expand_path('~/.right_api_client/login_test_runner.yml', __FILE__)))
-#@@api_client.log = -1 
+@@api_client.log  -1 
 raise "Unable to instanciate right api client, please check config file" if @@api_client.nil?
 
-
+##############################################################################
+# Class definitions
 
 class Test
   attr_accessor :todo_string, :stage_id, :stage, :name, :status, :next, :opts
@@ -217,6 +225,10 @@ end
 
 class Done < BaseStage
 end
+
+
+###############################################################################
+# Global functions, and main loop
 
 def check_todo_list
   raise "File location for todo list is nil" if @@file_location.nil?
