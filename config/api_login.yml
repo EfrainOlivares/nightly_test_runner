@@ -1,0 +1,5 @@
+:account_id: 67972 
+:email: <username> 
+:password: <email>
+:api_url: https://us-3.rightscale.com
+:api_version: 1.5
