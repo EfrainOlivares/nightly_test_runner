@@ -16,6 +16,7 @@ runner_options = YAML.load_file("./config/options.yaml")
 @@launch_limit  = runner_options[:launch_limit] 
 @@threshold     = runner_options[:threshold] 
 @@cloud         = runner_options[:cloud]
+@@run_anyway    = runner_options[:run_anyway]
 
 # Jenkins api client
 @@client = JenkinsApi::Client.new(YAML.load_file(File.expand_path("~/.jenkins_api_client/login.yml")))
@@ -23,7 +24,7 @@ raise "Unable to instantiate jenkins_api_client, please check config file" if @@
 
 # right_api_client
 @@api_client = RightApi::Client.new(YAML.load_file(File.expand_path('~/.right_api_client/login_test_runner.yml', __FILE__)))
-@@api_client.log  -1 
+@@api_client.log  nil 
 raise "Unable to instanciate right api client, please check config file" if @@api_client.nil?
 
 ##############################################################################
@@ -115,15 +116,20 @@ class Staging < BaseStage
       set_stage("(D)", "@unknown", "+unknown")
       return
     end
-    status = @@client.job.get_current_build_status(@opts[:name])
-    if status == "success"
-      @opts[:status] = "@success"
+
+    if @@run_anyway 
+      status = "@run_anyway"
+    else
+      status = @@client.job.get_current_build_status(@opts[:name])
+      if status == "success"
+        @opts[:status] = "@success"
+      end
     end
 
     total_up = total_deps_up(@@cloud)
     puts "TOTAL DEPLOYMENTS UP IS #{total_up}".fg 'light-blue'
     case @opts[:status]
-    when "@unknown"
+    when "@unknown", "@run_anyway"
       # Staging fist step is to launch it.
       if @@launched >= @@launch_limit
         puts "launch limit hit".fg 'yellow'

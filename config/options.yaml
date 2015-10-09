@@ -4,4 +4,5 @@
 :launch_limit: 5
 :threshold: 10
 :cloud: "rl10win"
+:run_anyway: true
 
