@@ -102,8 +102,6 @@ class BaseStage
   end
   def total_deps_up(prefix)
     deployments = @@api_client.deployments.index(:filter => ["name==#{prefix}"])
-    # Temp hack to exclude windows deployments.
-    deployments.reject! { |d| d.name =~ /windows/ }
     deployments.length
   end
 end
