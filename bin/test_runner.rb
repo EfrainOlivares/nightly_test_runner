@@ -10,7 +10,7 @@ require 'pry-byebug'
 ###############################################################################
 # Pick up config files and init befroe starting
 
-runner_options = YAML.load_file("./config/options.yaml")
+runner_options = YAML.load_file(File.expand_paty("~/.test_runner/options.yaml"))
 @@file_location = runner_options[:todo_file_location]
 @@launched      = runner_options[:launched] 
 @@launch_limit  = runner_options[:launch_limit] 
@@ -118,6 +118,7 @@ class Staging < BaseStage
     end
 
     if @@run_anyway 
+      puts "RUN_ANYWAY flag is on, passing builds will be rerun".fg 'yellow'
       status = "@run_anyway"
     else
       status = @@client.job.get_current_build_status(@opts[:name])

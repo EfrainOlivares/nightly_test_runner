@@ -2,6 +2,7 @@
 
 # Setup directory for test_runner config files
 mkdir /root/.test_runner
+cp config/options.yaml /root/.test_runner/
 
 # add todo shell application and it's config file
 cp todofiles/todo.sh /usr/local/bin/todo
