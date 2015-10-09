@@ -12,9 +12,9 @@ require 'pry-byebug'
 
 runner_options = YAML.load_file(File.expand_paty("~/.test_runner/options.yaml"))
 @@file_location = runner_options[:todo_file_location]
-@@launched      = runner_options[:launched] 
-@@launch_limit  = runner_options[:launch_limit] 
-@@threshold     = runner_options[:threshold] 
+@@launched      = runner_options[:launched]
+@@launch_limit  = runner_options[:launch_limit]
+@@threshold     = runner_options[:threshold]
 @@cloud         = runner_options[:cloud]
 @@run_anyway    = runner_options[:run_anyway]
 
@@ -24,7 +24,7 @@ raise "Unable to instantiate jenkins_api_client, please check config file" if @@
 
 # right_api_client
 @@api_client = RightApi::Client.new(YAML.load_file(File.expand_path('~/.right_api_client/login_test_runner.yml', __FILE__)))
-@@api_client.log  nil 
+@@api_client.log  nil
 raise "Unable to instanciate right api client, please check config file" if @@api_client.nil?
 
 ##############################################################################
@@ -38,8 +38,8 @@ class Test
 
   def initialize(string)
     elems = string.split(' ')
-    @opts = {} 
-    if elems.length == 1 
+    @opts = {}
+    if elems.length == 1
       @opts[:stage_id] = "(A)"
       @opts[:name] = string.chomp
       @opts[:status] = "@unknown"
@@ -56,9 +56,9 @@ class Test
       puts "#{elems.inspect} length: #{elems.length}"
       raise "Invalid todo formation for #{string}"
     end
-    
-    @todo_string = "#{@opts[:stage_id]} #{@opts[:name]} #{@opts[:status]} #{@opts[:next]}" 
-    
+
+    @todo_string = "#{@opts[:stage_id]} #{@opts[:name]} #{@opts[:status]} #{@opts[:next]}"
+
     case @opts[:stage_id]
     when "(A)"
       @stage = Staging.new(@opts)
@@ -73,7 +73,7 @@ class Test
     else
       raise "UNKOWN STAGE ID #{stage_id}"
     end
-  end 
+  end
 end
 
 class BaseStage
@@ -93,10 +93,10 @@ class BaseStage
   end
 
   def get_line
-    return "#{@opts[:stage_id]} #{@opts[:name]} #{@opts[:status]} #{@opts[:next]}" 
+    return "#{@opts[:stage_id]} #{@opts[:name]} #{@opts[:status]} #{@opts[:next]}"
   end
   def is_up?
-    name = @opts[:name] 
+    name = @opts[:name]
     deployments = @@api_client.deployments.index(:filter => ["name==#{name}"])
     deployments.empty? ? false : true
   end
@@ -117,7 +117,7 @@ class Staging < BaseStage
       return
     end
 
-    if @@run_anyway 
+    if @@run_anyway
       puts "RUN_ANYWAY flag is on, passing builds will be rerun".fg 'yellow'
       status = "@run_anyway"
     else
@@ -143,7 +143,7 @@ class Staging < BaseStage
         @opts[:status] = "@launched"
         @opts[:next] = "+check_it_launched"
         puts "Sleeping for 30 seconds to allow deployment to show up on radar".fg 'yellow'
-        sleep 30 
+        sleep 30
       end
     when "@launched"
       #puts "Check if it's running and if so transition to 'running' stage"
@@ -210,14 +210,14 @@ class DestroyAndRerun < BaseStage
       rescue
         puts "UNABLE TO DESTROY Z_#{@opts[:name]}!".fg 'yellow'
         @opts[:status] = "@unknown"
-      end 
+      end
     when "@destroying"
       begin
         status = @@client.job.get_current_build_status("Z_#{@opts[:name]}")
       rescue
         puts "UNABLE TO GET STATUS ON Z_#{@opts[:name]}!".fg 'yellow'
         status = "@unknown"
-      end  
+      end
       case status
       when "success"
         # destroyer completed, good to go, transition back to staging
@@ -225,7 +225,7 @@ class DestroyAndRerun < BaseStage
       when "failure"
         # destroyer bombed, got to have a look
         set_stage("(X)", "@failure", "+destroyer_failed_review")
-      end    
+      end
     end
   end
 end
@@ -263,23 +263,23 @@ while true
 
   # load up the todo list
   tests = check_todo_list
-  
+
   # Iterate over and process each test
   tests.each do |test|
     puts "Processing #{test.get_line}"
     test.process
   end
-  
+
   # save updated todo list
   File.open(@@file_location, 'w') do |file|
     tests.each do |test|
       file.puts test.get_line
     end
   end
-  system("todo list")  
-  wait_seconds = 15 
+  system("todo list")
+  wait_seconds = 15
   (1..wait_seconds).each do |i|
     print "Sleeping #{wait_seconds- i} seconds\r"
-    sleep 1 
+    sleep 1
   end
 end
