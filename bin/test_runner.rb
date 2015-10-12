@@ -10,7 +10,7 @@ require 'pry-byebug'
 ###############################################################################
 # Pick up config files and init befroe starting
 
-runner_options = YAML.load_file(File.expand_paty("~/.test_runner/options.yaml"))
+runner_options = YAML.load_file(File.expand_path("~/.test_runner/options.yaml"))
 @@file_location = runner_options[:todo_file_location]
 @@launched      = runner_options[:launched]
 @@launch_limit  = runner_options[:launch_limit]
@@ -50,11 +50,17 @@ class Test
       @opts[:status] = elems[2]
       @opts[:next]   = elems[3]
     else
-      puts "ERROR:  Invalid string formation"
-      puts "todo strings should be single word for name of test"
-      puts "or 4 words with stage, name, status, next"
-      puts "#{elems.inspect} length: #{elems.length}"
-      raise "Invalid todo formation for #{string}"
+      error_mssg = <<-ERRORMSG.gsub(/^\s*/, "")
+        ERROR:  Invalid string formation. todo strings should be one of
+        - single word for name of test
+        - 4 words with stage, name, status, next
+        -
+        Received #{elems.length} words in string.
+        -
+        #{string}
+      ERRORMSG
+      puts error_mssg.fg 'red'
+      exit 1
     end
 
     @todo_string = "#{@opts[:stage_id]} #{@opts[:name]} #{@opts[:status]} #{@opts[:next]}"
@@ -179,6 +185,7 @@ end
 
 class Running < BaseStage
   def process
+
     status = @@client.job.get_current_build_status(@opts[:name])
     puts "RUNNING #{get_line} with status #{status}"
     case @opts[:status]
