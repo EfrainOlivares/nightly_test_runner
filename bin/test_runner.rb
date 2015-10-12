@@ -12,6 +12,7 @@ require 'pry-byebug'
 
 runner_options = YAML.load_file(File.expand_path("~/.test_runner/options.yaml"))
 @@file_location = runner_options[:todo_file_location]
+@@prefix        = runner_options[:prefix]
 @@launched      = runner_options[:launched]
 @@launch_limit  = runner_options[:launch_limit]
 @@threshold     = runner_options[:threshold]
@@ -88,6 +89,11 @@ class BaseStage
     @opts = _opts
   end
 
+  def subset(_opts, sub)
+    subset = _opts.select { |k,v| sub.keys.include? k }
+    subset == sub
+  end
+
   def process
     puts "Base processing default"
   end
@@ -110,6 +116,22 @@ class BaseStage
     deployments = @@api_client.deployments.index(:filter => ["name==#{prefix}"])
     deployments.length
   end
+  def launch_destroyer(job_name)
+    destroyer_name = "Z_#{job_name}"
+    current_launches = @@client.job.get_builds(destroyer_name).length
+    @@client.job.build(destroyer_name)
+    wait_seconds = -30
+    (wait_seconds..0).each do |i|
+      print "Waiting #{i.abs} for #{job_name} Destroyer to start\r"
+      new_launches = @@client.job.get_builds(destroyer_name).length
+      if current_launches +1 == new_launches
+         puts "Registered new destroyer for #{job_name}".fg 'yellow'
+         return
+      end
+      sleep 1
+    end
+    puts "Destroyer did not launch in #{wait_seconds} for #{job_name}".fg 'red'
+  end
 end
 
 class Staging < BaseStage
@@ -131,7 +153,7 @@ class Staging < BaseStage
       end
     end
 
-    total_up = total_deps_up(@@cloud)
+    total_up = total_deps_up(@@prefix)
     puts "TOTAL DEPLOYMENTS UP IS #{total_up}".fg 'light-blue'
     case @opts[:status]
     when "@unknown", "@run_anyway"
@@ -185,23 +207,31 @@ end
 
 class Running < BaseStage
   def process
-
-    status = @@client.job.get_current_build_status(@opts[:name])
-    puts "RUNNING #{get_line} with status #{status}"
-    case @opts[:status]
-    when "@running"
-      # Job was running when we last checked, so let's see if we need a state transition
-      case status
-      when "success"
-        set_stage("(C)", "@success", "+review")
-      when "failure"
-        set_stage("(X)", "@failure", "+review")
-      end
+    @opts[:status]  = @@client.job.get_current_build_status(@opts[:name])
+    puts "RUNNING #{get_line} with status #{@opts[:status]}"
+    case
+    when subset(@opts, status: "success")
+      set_stage("(C)", "@success", "+review")
+    when subset(@opts, status: "failure")
+      launch_destroyer(@opts[:name])
+      set_stage("(X)", "@failure", "+review")
     end
   end
 end
 
 class Failed < BaseStage
+  def process
+    destroyer_name = "#{@opts[:name]}"
+    destroy_status = @@client.job.get_current_build_status(destroyer_name)
+    case destroy_status
+    when "success"
+      # This is a no-op, just ignore it
+      ;
+    when "failure"
+      # This is a no-op just ignore for now
+      ;
+    end
+  end
 end
 
 class DestroyAndRerun < BaseStage
