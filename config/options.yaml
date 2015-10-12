@@ -1,8 +1,8 @@
 ---
 :todo_file_location: "/root/.test_runner/todo.txt"
+:prefix: ""
 :launched: 0
 :launch_limit: 5
 :threshold: 10
 :cloud: ""
 :run_anyway: false 
-
