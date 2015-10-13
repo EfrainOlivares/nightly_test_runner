@@ -81,6 +81,13 @@ class Test
       raise "UNKOWN STAGE ID #{stage_id}"
     end
   end
+  def done?
+    if @stage.class == Done || @stage.class == Failed
+      true
+    else
+      false
+    end
+  end
 end
 
 class BaseStage
@@ -312,6 +319,17 @@ while true
     end
   end
   system("todo list")
+
+  done = false
+  tests.each do |test|
+    done = true if test.done?
+  end
+
+  if done
+    puts "ALL TESTS PROCESSED, SHUTTING DOWN".fg 'green'
+    exit 0
+  end
+
   wait_seconds = 15
   (1..wait_seconds).each do |i|
     print "Sleeping #{wait_seconds- i} seconds\r"
