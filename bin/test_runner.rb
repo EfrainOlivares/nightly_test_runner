@@ -49,7 +49,6 @@ class Test
     @opts = opts
     @thresholds = @opts[:thresholds]
     @cloud_name = cloud_name(@name)
-    puts "#{@stage}: #{@name}".fg 'yellow'
   end # initialize
 
   def is_up?
@@ -61,14 +60,15 @@ class Test
   end
 
   def done?
-    @stage == Done
+    @stage == Done || @stage == Failed || @stage == ErrorState
   end
 
   def update_percepts
     @percepts[:dup]        = is_up?
     @percepts[:job_status] = job_status
     @percepts[:des_status] = des_status
-    puts "Updated percepts: #{@percepts.inspect}".fg 'yellow'
+
+    puts "#{@stage} #{@name} #{@percepts.inspect}".fg 'yellow'
   end
 
   def job_status
@@ -197,6 +197,10 @@ class StageLaunch < BaseStage
     case
     when subset(percepts, dup: "up", job_status: "running")
       transition(test, Running)
+    when subset(percepts, dup: "up", job_status: "failure")
+      transition(test, Failed)
+    when subset(percepts, dup: "up", job_status: "aborted")
+      transition(test, ErrorState)
     when subset(percepts, dup: "down")
       action(test, "launch_if_cleared")
     end
@@ -213,6 +217,7 @@ class Running < BaseStage
     when subset(percepts, dup: "up", job_status: "success")
       transition(test, Done)
     when subset(percepts, dup: "up", job_status: "failure")
+      action(test, "launch_destroyer")
       transition(test, Failed)
     end
   end
@@ -225,13 +230,6 @@ end
 
 class Failed < BaseStage
   def self.process(test, percepts)
-    case
-    when subset(percepts, job_status: "failure")
-      action(test, "launch_destroyer")
-      transition(test, Done)
-    when subset(percepts, job_status: "success")
-      transition(test, Done)
-    end
   end
 end
 
