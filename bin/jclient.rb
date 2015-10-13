@@ -79,4 +79,4 @@ end
 matrix = Matrix.new(@client_opts, @prefix)
 
 binding.pry
-
+puts
