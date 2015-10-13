@@ -7,13 +7,12 @@ require 'pry'
 require 'pry-byebug'
 
 class Test
-  attr_accessor :todo_string, :stage_id, :stage, :name, :status, :next, :opts
-  attr_accessor :percepts, :jclient, :rsclient
+  attr_accessor :percepts, :jclient, :rsclien, :opts
+  attr_accessor :stage, :thresholds, :cloud_name
   extend Forwardable
-  def_delegators :@stage, :process 
-  def_delegators :@stage, :total_deps_up
+  def_delegators :@stage, :process
 
-  def initialize(string, jclient, rsclient)
+  def initialize(string, jclient, rsclient, opts)
     elems = string.split(' ')
     @percepts = {}
     if elems.length == 1
@@ -43,7 +42,10 @@ class Test
     end
     @jclient = jclient
     @rsclient = rsclient
-    puts "#{@stage}: #{@name}\t#{@percepts.inspect}".fg 'yellow'
+    @opts = opts
+    @thresholds = @opts[:thresholds]
+    @cloud_name = cloud_name(@name)
+    puts "#{@stage}: #{@name}".fg 'yellow'
   end # initialize
 
   def is_up?
@@ -59,9 +61,9 @@ class Test
   end
 
   def update_percepts
-    @percepts[:dup] = is_up?
-    @percepts[:job_status] = job_status 
-    @percepts[:des_status] = des_status 
+    @percepts[:dup]        = is_up?
+    @percepts[:job_status] = job_status
+    @percepts[:des_status] = des_status
     puts "Updated percepts: #{@percepts.inspect}".fg 'yellow'
   end
 
@@ -73,6 +75,23 @@ class Test
     @jclient.job.get_current_build_status("Z_#{@name}")
   end
 
+  def launch_if_cleared
+    if @thresholds.has_key? @cloud_name
+      allowed = @thresholds[@cloud_name]
+      current =  total_deps_up("#{@prefix}_#{@cloud_name}")
+      if current < allowed
+        puts "Threshold clear, currently #{current} up out of #{allowed}".fg 'yellow'
+        launch_job
+      else
+        puts "Holding on #{@name} launch.".fg 'red'
+        puts "Hit allowed limit.  #{current} deployments out of #{allowed} running.".fg 'red'
+      end
+    else
+      puts "No limit on number of deployments found, launching #{@name}"
+      launch_job
+    end
+  end
+
   def launch_job
     build_jenkins_job(@name, -3)
     (-3..0).each do |i|
@@ -82,9 +101,15 @@ class Test
          return true
        end
     end
-    raise "Timeout waiting for #{@name} deployment to be created"  
+    raise "Timeout waiting for #{@name} deployment to be created"
   end
 
+  def abort_job
+    @jclient.job.abort(@name)
+  end
+  def abort_destroyer
+    @jclient.job.abort("Z_#{@name}")
+  end
   def launch_destroyer
     build_jenkins_job("Z_#{@name}", -3)
   end
@@ -98,6 +123,16 @@ class Test
   end
 
   private
+
+  def cloud_name(name)
+    name.split('_')[1..2].join('_')
+  end
+
+  def total_deps_up(filter)
+    deployments = @rsclient.deployments.index(filter: ["name==#{filter}"])
+    deployments.length
+  end
+
   def build_jenkins_job(job_name, wait_seconds)
     current_launches = @jclient.job.get_builds(job_name).length
     @jclient.job.build(job_name)
@@ -122,18 +157,23 @@ class BaseStage
 
   def self.any(_opts, matches)
     matches.each do |key, _|
-      return true if _opts[key] == matches[key] 
+      return true if _opts[key] == matches[key]
     end
     false
   end
-     
+
   def self.process(test, percepts)
     raise "Base processing default should never be called"
   end
 
   def self.transition(test, stage)
-    puts "TRANSITION: #{self} => #{stage}".fg 'yellow'
+    puts "TRANSITION: #{self} => #{stage}".fg 'green'
     test.stage = stage
+  end
+
+  def self.action(test, action)
+    puts "ACTION: #{self} stage, calling test.#{action}".fg 'green'
+    test.send(action)
   end
 end
 
@@ -143,10 +183,20 @@ class Staging < BaseStage
     when any(percepts, dup: "up", job_status: "running")
       transition(test, DestroyAndRerun)
     when subset(percepts, dup: "down")
-      test.launch_job
-      transition(test, Running)
+      transition(test, StageLaunch)
     end
   end
+end
+
+class StageLaunch < BaseStage
+  def self.process(test, percepts)
+    case
+    when subset(percepts, dup: "up", job_status: "running")
+      transition(test, Running)
+    when subset(percepts, dup: "down")
+      action(test, "launch_if_cleared")
+    end
+   end
 end
 
 class Running < BaseStage
@@ -154,13 +204,13 @@ class Running < BaseStage
     case
     when subset(percepts, dup: "down")
       transition(test, ErrorState)
-    when subset(percepts, job_status: "running")
-      test.wait
+    when subset(percepts, dup: "up", job_status: "running")
+      action(test, "wait")
     when subset(percepts, dup: "up", job_status: "success")
       transition(test, Done)
     when subset(percepts, dup: "up", job_status: "failure")
       transition(test, Failed)
-    end 
+    end
   end
 end
 
@@ -173,7 +223,7 @@ class Failed < BaseStage
   def self.process(test, percepts)
     case
     when subset(percepts, job_status: "failure")
-      test.launch_destroyer
+      action(test, "launch_destroyer")
       transition(test, Done)
     when subset(percepts, job_status: "success")
       transition(test, Done)
@@ -185,11 +235,11 @@ class DestroyAndRerun < BaseStage
   def self.process(test, percepts)
     case
     when subset(percepts, job_status: "running")
-      test.abort_job
+      action(test, "abort_job")
     when subset(percepts, des_status: "running")
-      test.wait
+      action(test, "wait")
     when subset(percepts, dup: "up")
-      test.launch_destroyer
+      action(test, "launch_destroyer")
     when subset(percepts, dup: "down")
       transition(test, Staging)
     end
@@ -224,7 +274,7 @@ class Runner
     tests = []
     todo_list.each do |item|
       next if (0 == (item =~ /\s+/)) # skip on empty lines
-      tests << Test.new( item , @jclient, @rsclient)
+      tests << Test.new( item , @jclient, @rsclient, @options)
     end
     tests
   end
@@ -232,19 +282,19 @@ class Runner
   def run
     ####  main running loop
     while true
-      system "clear"
+#      system "clear"
       # reset launch limit
       @@launched = 0
-    
+
       # load up the todo list
       tests = check_todo_list
-    
+
       # Iterate over and process each test
       tests.each do |test|
         test.update_percepts
         test.process
       end
-    
+
       # save updated todo list
       File.open(@options[:todo_file_location], 'w') do |file|
         tests.each do |test|
@@ -253,18 +303,18 @@ class Runner
       end
 
       system("todo list")
-    
+
       done = false
       tests.each do |test|
         done = true if test.done?
         break unless done
       end
-    
+
       if done
         puts "ALL TESTS PROCESSED, SHUTTING DOWN".fg 'green'
         exit 0
       end
-    
+
       wait_seconds = 15
       (1..wait_seconds).each do |i|
         print "Sleeping #{wait_seconds- i} seconds\r"

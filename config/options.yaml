@@ -1,8 +1,11 @@
 ---
 :todo_file_location: "/root/.test_runner/todo.txt"
-:prefix: ""
+:prefix: "rl10lin_"
 :launched: 0
 :launch_limit: 5
-:threshold: 10
+:thresholds: {
+  Google_Silicon: 0
+}
 :cloud: ""
-:run_anyway: false 
+:run_anyway: true 
+
