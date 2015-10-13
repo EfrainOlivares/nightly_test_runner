@@ -13,14 +13,20 @@ class Test
   def_delegators :@stage, :process
 
   def initialize(string, jclient, rsclient, opts)
+    @jclient = jclient
+    @rsclient = rsclient
     elems = string.split(' ')
     @percepts = {}
     if elems.length == 1
-      @stage = Staging
       @name = string.chomp
-      @percepts[:dup]  = "unknown"
-      @percepts[:job_status] = "unknown"
-      @percepts[:des_status] = "unknown"
+      update_percepts
+      if opts[:run_anyway] == false && @percepts[:job_status] == "success"
+        puts "run_always flag not off, and test passsed, going straight to Done".fg 'yellow'
+        @stage = Done
+      else
+        puts "New test, set to Staging".fg 'yellow'
+        @stage = Staging
+      end
     elsif elems.length == 5
       @stage  = eval elems[0]
       @name   = elems[1]
@@ -40,8 +46,6 @@ class Test
       puts error_mssg.fg 'red'
       exit 1
     end
-    @jclient = jclient
-    @rsclient = rsclient
     @opts = opts
     @thresholds = @opts[:thresholds]
     @cloud_name = cloud_name(@name)
@@ -79,7 +83,7 @@ class Test
     if @thresholds.has_key? @cloud_name
       allowed = @thresholds[@cloud_name]
       current =  total_deps_up("#{@prefix}_#{@cloud_name}")
-      if current < allowed
+      if current <= allowed
         puts "Threshold clear, currently #{current} up out of #{allowed}".fg 'yellow'
         launch_job
       else
@@ -119,7 +123,7 @@ class Test
   end
 
   def wait
-    puts "Test #{@name} no activity to be done this round, waiting".fg 'light-blue'
+    puts "No-op waiting".fg 'light-blue'
   end
 
   private
@@ -283,8 +287,6 @@ class Runner
     ####  main running loop
     while true
 #      system "clear"
-      # reset launch limit
-      @@launched = 0
 
       # load up the todo list
       tests = check_todo_list
@@ -302,7 +304,7 @@ class Runner
         end
       end
 
-      system("todo list")
+      # TODO: view current list now?
 
       done = false
       tests.each do |test|
@@ -330,5 +332,4 @@ jclient = JenkinsApi::Client.new(YAML.load_file(File.expand_path("~/.jenkins_api
 rsclient = RightApi::Client.new(YAML.load_file(File.expand_path('~/.right_api_client/login_test_runner.yml', __FILE__)))
 
 runner = Runner.new(options, jclient, rsclient)
-runner.check_todo_list
 runner.run
