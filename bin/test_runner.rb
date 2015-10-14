@@ -210,14 +210,16 @@ end
 class Running < BaseStage
   def self.process(test, percepts)
     case
-    when subset(percepts, dup: "down")
+    when subset(percepts, job_status: "aborted")
       transition(test, ErrorState)
-    when subset(percepts, dup: "up", job_status: "running")
+    when subset(percepts, job_status: "running")
       action(test, "wait")
-    when subset(percepts, dup: "up", job_status: "success")
+    when subset(percepts, job_status: "success")
       transition(test, Done)
     when subset(percepts, dup: "up", job_status: "failure")
       action(test, "launch_destroyer")
+      transition(test, Failed)
+    when subset(percepts, dup: "down", job_status: "failure")
       transition(test, Failed)
     end
   end
