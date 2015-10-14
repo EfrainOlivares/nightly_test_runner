@@ -304,9 +304,9 @@ class Runner
 
       # TODO: view current list now?
 
-      done = false
+      done = true
       tests.each do |test|
-        done = true if test.done?
+        done = test.done?
         break unless done
       end
 
