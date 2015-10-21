@@ -37,16 +37,20 @@ you'll see it's simply calling a script to do that in bash.
 
 ## Using the ~/.test\_runner config file.
  The config file contains several parameters to help control the flow of the jobs.
+
 ### todo\_file\_location
  * Set location and name for the file containing the list of jobs to run.
+
 ### prefix
  * This is an important parameter.  It identifies which jobs belong to this monkey and is used in searching for and
 counting the number of deployments up.
+
 ### thresholds
  * This is a hash containing the cloud name in the job name, ex. AWS_ORG, or Google_Silicon.
  * The number corresponding to the cloud indicates how many deployments it should allow up.
  * Once the number of deployments is hit for this cloud, any other builds will skip until capacity opens up.
  * Use this to throttle testing on capacitly limited clouds, while allowing other high capacity clouds to pick up speed.
+
 ### run\_anyway
  * When this is false, a job already run and passing will be skipped automatically.
  * When this is true, the job will be rerun anyway.
