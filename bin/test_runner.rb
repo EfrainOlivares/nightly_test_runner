@@ -21,7 +21,7 @@ class Test
     @percepts = {}
     if elems.size == 1
       @name = test_in_string_format.chomp
-      update_percepts
+      init_percepts
       if opts[:force_run] == false && @percepts[:job_status] == "success"
         puts "force_run flag not off, and test passed, going straight to Done".fg 'yellow'
         @stage = Done
@@ -29,7 +29,9 @@ class Test
         puts "New test, set to Staging".fg 'yellow'
         @stage = Staging
       end
-    elsif elems.size == 5
+    elsif elems.length == 7
+      @percepts[:build] = elems[6]
+      @percepts[:build_id] = elems[5]
       @stage  = eval elems[0]
       @name   = elems[1]
       @percepts[:dup]    = elems[2]
@@ -39,7 +41,7 @@ class Test
       error_mssg = <<-ERRORMSG.gsub(/^\s*/, "")
         ERROR:  Invalid test_in_string_format formation. job test_in_string_formats should be one of
         - single word for name of test
-        - 5 words with stage, name, depstatus, jobstatus, destroystatus
+        - 7 words with stage, name, depstatus, jobstatus, destroystatus, build_id, build
         -
         Received #{elems.size} words in test_in_string_format.
         -
@@ -58,19 +60,41 @@ class Test
   end
 
   def get_line
-    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:destroyer_status]}"
+    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:des_status]} #{@percepts[:build_id]} #{@percepts[:build]}"
   end
 
   def done?
     @stage == Done || @stage == Failed || @stage == ErrorState
   end
 
-  def update_percepts
+  def init_percepts
     @percepts[:dup]        = is_up?
     @percepts[:job_status] = job_status
     @percepts[:destroyer_status] = destroyer_status
+    @percepts[:build_id]   = job_id
+    @percepts[:build]      = "same"
+  end
 
+  def update_percepts
+    @percepts[:dup]        = is_up?
+    @percepts[:job_status] = job_status
+    @percepts[:des_status] = des_status
+    new_id = job_id
+    delta = new_id.to_i - @percepts[:build_id].to_i
+    unless delta == 0
+      case
+      when delta == 1
+        @percepts[:build] = "next"
+        @percepts[:build_id] = new_id
+      when delta > 1
+        raise "ERROR: More than one build difference. last: #{@percepts[:build_id]} new: #{new_id}"
+      end
+    end
     puts "#{@stage} #{@name} #{@percepts.inspect}".fg 'yellow'
+  end
+
+  def job_id
+    @jclient.job.build_number(@name)
   end
 
   def job_status
@@ -202,13 +226,14 @@ end
 class StageLaunch < BaseStage
   def self.process(test, percepts)
     case
-    when subset(percepts, dup: "up", job_status: "running")
+    when subset(percepts, build: "next", job_status: "running")
       transition(test, Running)
-    when subset(percepts, dup: "up", job_status: "failure")
+    when subset(percepts, build: "next", job_status: "failure")
+      action(test, "launch_destroyer")
       transition(test, Failed)
-    when subset(percepts, dup: "up", job_status: "aborted")
+    when subset(percepts, build: "next", job_status: "aborted")
       transition(test, ErrorState)
-    when subset(percepts, dup: "down")
+    when subset(percepts, build: "same", dup: "down")
       action(test, "launch_if_cleared")
     end
    end
@@ -291,6 +316,7 @@ class Runner
 
   def run
     ####  main running loop
+    # TODO: change this to loop-do when done with debugging
     while true
 
       # load up the jobs list

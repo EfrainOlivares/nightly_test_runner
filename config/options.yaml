@@ -2,6 +2,10 @@
 :jobs_file_location: "/root/.test_runner/jobs.txt"
 :prefix: "rl10lin_"
 :thresholds: {
-  Google_Silicon: 0
+  Google_Silicon: 5,
+  AWS_ORG: 5,
+  VScale_VMW: 0,
+  SL_DAL: 0,
+  OST_JUN: 0
 }
 :force_run: true
