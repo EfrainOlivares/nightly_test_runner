@@ -244,6 +244,8 @@ class StageLaunch < BaseStage
       transition(test, Failed)
     when subset(percepts, build: "next", job_status: "aborted")
       transition(test, ErrorState)
+    when subset(percepts, build: "next", job_status: "success")
+      transition(test, Done)
     when subset(percepts, build: "same", dup: "down")
       action(test, "launch_if_cleared")
     end
