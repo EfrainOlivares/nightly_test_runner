@@ -5,6 +5,18 @@ require 'pry'
 require 'pry-byebug'
 require 'tco'
 
+# Description:  This script is intended to provide access to a remote jenkins.
+#
+# Usually, the nigntly automation will run on the same master jenkins.  When that
+# is the case, getting a list of available jobs is as easy as 'ls /var/lib/jenkins/jobs'
+# A list of the jobs to run is consumed by the test_runner.
+# However, with the need to run linux, windows and publish matrices, and two different cloud accounts,
+# it is desired goal to be able to run all masters from one single machine.  This nightly_test_runner
+# is a start.  In particular, this script, (jclient) gives you access to job lists from remote jenkins
+# servers.  Future updates will allow multiple jenkins servers, and thus all matrices run from one monkey.
+#
+# This repo is still a WIP
+
 @client_opts = YAML.load_file(File.expand_path("~/.jenkins_api_client/login.yml"))
 @prefix = 'rl10'
 
