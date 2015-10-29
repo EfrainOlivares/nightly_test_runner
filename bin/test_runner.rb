@@ -12,6 +12,8 @@ class Test
   extend Forwardable
   def_delegators :@stage, :process
 
+  # test_in_string_format is a representation of the test state.
+  # It's elements are stage, name, deployment status, jenkins job status, jenkins destroyer status
   def initialize(test_in_string_format, jclient, rsclient, opts)
     @jclient = jclient
     @rsclient = rsclient
