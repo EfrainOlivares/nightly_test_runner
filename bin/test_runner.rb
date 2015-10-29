@@ -85,7 +85,7 @@ class Test
     if @thresholds.has_key? @cloud_name
       allowed = @thresholds[@cloud_name]
       current =  total_deps_up("#{@prefix}_#{@cloud_name}")
-      if current <= allowed
+      if current < allowed
         puts "Threshold clear, currently #{current} up out of #{allowed}".fg 'yellow'
         launch_job
       else
