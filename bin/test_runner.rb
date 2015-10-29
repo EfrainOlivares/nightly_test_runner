@@ -286,7 +286,6 @@ class Runner
   def run
     ####  main running loop
     while true
-#      system "clear"
 
       # load up the jobs list
       tests = load_jobs_list
