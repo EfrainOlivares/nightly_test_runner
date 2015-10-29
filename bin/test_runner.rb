@@ -32,7 +32,7 @@ class Test
       @name   = elems[1]
       @percepts[:dup]    = elems[2]
       @percepts[:job_status] = elems[3]
-      @percepts[:des_status]   = elems[4]
+      @percepts[:destroyer_status]   = elems[4]
     else
       error_mssg = <<-ERRORMSG.gsub(/^\s*/, "")
         ERROR:  Invalid string formation. job strings should be one of
@@ -56,7 +56,7 @@ class Test
   end
 
   def get_line
-    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:des_status]}"
+    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:destroyer_status]}"
   end
 
   def done?
@@ -66,7 +66,7 @@ class Test
   def update_percepts
     @percepts[:dup]        = is_up?
     @percepts[:job_status] = job_status
-    @percepts[:des_status] = des_status
+    @percepts[:destroyer_status] = destroyer_status
 
     puts "#{@stage} #{@name} #{@percepts.inspect}".fg 'yellow'
   end
@@ -75,7 +75,7 @@ class Test
     @jclient.job.get_current_build_status(@name)
   end
 
-  def des_status
+  def destroyer_status
     @jclient.job.get_current_build_status("Z_#{@name}")
   end
 
@@ -240,7 +240,7 @@ class DestroyAndRerun < BaseStage
     case
     when subset(percepts, job_status: "running")
       action(test, "abort_job")
-    when subset(percepts, des_status: "running")
+    when subset(percepts, destroyer_status: "running")
       action(test, "wait")
     when subset(percepts, dup: "up")
       action(test, "launch_destroyer")
