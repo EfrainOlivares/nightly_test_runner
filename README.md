@@ -51,7 +51,7 @@ counting the number of deployments up.
  * Once the number of deployments is hit for this cloud, any other builds will skip until capacity opens up.
  * Use this to throttle testing on capacitly limited clouds, while allowing other high capacity clouds to pick up speed.
 
-### run\_anyway
+### force\_run
  * When this is false, a job already run and passing will be skipped automatically.
  * When this is true, the job will be rerun anyway.
  * On a first pass you might use true to run every single job on the list.  On a second pass, you might set to false to rerun 
