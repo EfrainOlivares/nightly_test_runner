@@ -23,11 +23,11 @@ all existing jobs (no destructors) except for the AWS cloud.  If you inspect scr
 you'll see it's simply calling a script to do that in bash.
 
 ## Using a list of jobs
- * After you've created a list of jobs copy them to a file in ~/.test_runner/todo.txt
+ * After you've created a list of jobs copy them to a file in ~/.test_runner/job_list
  * cd into /root/nightly_test_runner and execute ```bin/test_runner```
 
 ## What test\_runner execution does.
- * It opens the todo.txt file and will walk through that list every 30 seconds.
+ * It opens the job_list file and will walk through that list every 30 seconds.
  * Every time it walks through the list, it will query for job information using jenkins and rightscale apis.
  * It will get deployment up or down status, jenkins job status, and jenkins destroyer status.
  * Based on those status' it will determing whether to launch, or clean up and then launch the jobs.
