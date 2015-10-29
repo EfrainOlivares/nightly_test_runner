@@ -12,13 +12,13 @@ class Test
   extend Forwardable
   def_delegators :@stage, :process
 
-  def initialize(string, jclient, rsclient, opts)
+  def initialize(test_in_string_format, jclient, rsclient, opts)
     @jclient = jclient
     @rsclient = rsclient
-    elems = string.split(' ')
+    elems = test_in_string_format.split(' ')
     @percepts = {}
     if elems.length == 1
-      @name = string.chomp
+      @name = test_in_string_format.chomp
       update_percepts
       if opts[:force_run] == false && @percepts[:job_status] == "success"
         puts "force_run flag not off, and test passsed, going straight to Done".fg 'yellow'
@@ -35,13 +35,13 @@ class Test
       @percepts[:destroyer_status]   = elems[4]
     else
       error_mssg = <<-ERRORMSG.gsub(/^\s*/, "")
-        ERROR:  Invalid string formation. job strings should be one of
+        ERROR:  Invalid test_in_string_format formation. job test_in_string_formats should be one of
         - single word for name of test
         - 5 words with stage, name, depstatus, jobstatus, destroystatus
         -
-        Received #{elems.length} words in string.
+        Received #{elems.length} words in test_in_string_format.
         -
-        #{string}
+        #{test_in_string_format}
       ERRORMSG
       puts error_mssg.fg 'red'
       exit 1
