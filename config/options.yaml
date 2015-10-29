@@ -4,5 +4,4 @@
 :thresholds: {
   Google_Silicon: 0
 }
-:run_anyway: true 
-
+:force_run: true
