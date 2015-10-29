@@ -21,7 +21,7 @@ class Test
       @name = test_in_string_format.chomp
       update_percepts
       if opts[:force_run] == false && @percepts[:job_status] == "success"
-        puts "force_run flag not off, and test passsed, going straight to Done".fg 'yellow'
+        puts "force_run flag not off, and test passed, going straight to Done".fg 'yellow'
         @stage = Done
       else
         puts "New test, set to Staging".fg 'yellow'
