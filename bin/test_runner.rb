@@ -267,13 +267,12 @@ class Runner
   end
 
   def load_jobs_list
-    raise "File location for jobs list is nil" if options[:jobs_file_location].nil?
+    raise "File location for jobs list is nil" if @options[:jobs_file_location].nil?
     puts "Loading #{@options[:jobs_file_location]}"
     begin
       jobs_list = File.readlines(@options[:jobs_file_location])
     rescue
-      puts "File not found"
-      exit
+      raise "File not found at #{@options[:jobs_file_location]}"
     end
     tests = []
     jobs_list.each do |item|
