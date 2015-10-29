@@ -1,5 +1,5 @@
 ---
-:todo_file_location: "/root/.test_runner/todo.txt"
+:jobs_file_location: "/root/.test_runner/jobs.txt"
 :prefix: "rl10lin_"
 :thresholds: {
   Google_Silicon: 0

@@ -35,7 +35,7 @@ class Test
       @percepts[:des_status]   = elems[4]
     else
       error_mssg = <<-ERRORMSG.gsub(/^\s*/, "")
-        ERROR:  Invalid string formation. todo strings should be one of
+        ERROR:  Invalid string formation. job strings should be one of
         - single word for name of test
         - 5 words with stage, name, depstatus, jobstatus, destroystatus
         -
@@ -266,17 +266,17 @@ class Runner
     raise unless @rsclient = rsclient
   end
 
-  def check_todo_list
-    raise "File location for todo list is nil" if options[:todo_file_location].nil?
-    puts "Loading #{@options[:todo_file_location]}"
+  def load_jobs_list
+    raise "File location for jobs list is nil" if options[:jobs_file_location].nil?
+    puts "Loading #{@options[:jobs_file_location]}"
     begin
-      todo_list = File.readlines(@options[:todo_file_location])
+      jobs_list = File.readlines(@options[:jobs_file_location])
     rescue
       puts "File not found"
       exit
     end
     tests = []
-    todo_list.each do |item|
+    jobs_list.each do |item|
       next if (0 == (item =~ /\s+/)) # skip on empty lines
       tests << Test.new( item , @jclient, @rsclient, @options)
     end
@@ -288,8 +288,8 @@ class Runner
     while true
 #      system "clear"
 
-      # load up the todo list
-      tests = check_todo_list
+      # load up the jobs list
+      tests = load_jobs_list
 
       # Iterate over and process each test
       tests.each do |test|
@@ -297,8 +297,8 @@ class Runner
         test.process
       end
 
-      # save updated todo list
-      File.open(@options[:todo_file_location], 'w') do |file|
+      # save updated jobs list
+      File.open(@options[:jobs_file_location], 'w') do |file|
         tests.each do |test|
           file.puts test.get_line
         end

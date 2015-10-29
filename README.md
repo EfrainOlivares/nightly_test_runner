@@ -38,7 +38,7 @@ you'll see it's simply calling a script to do that in bash.
 ## Using the ~/.test\_runner config file.
  The config file contains several parameters to help control the flow of the jobs.
 
-### todo\_file\_location
+### job_list\_file\_location
  * Set location and name for the file containing the list of jobs to run.
 
 ### prefix
