@@ -131,6 +131,12 @@ class Test
   private
 
   def cloud_name(name)
+    # The rocket monkey naming convention goes like this:
+    # prefix_cloud_region_testname...
+    # What this test calls cloud name is actually 'cloud_region'
+    # So split on _ and get those two, for example.
+    # rl10lin_Google_Silicon_monitoring...
+    # yields 'Google_Silicon' as cloud name.
     name.split('_')[1..2].join('_')
   end
 
