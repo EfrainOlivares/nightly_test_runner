@@ -311,21 +311,15 @@ class Runner
 
       # TODO: view current list now?
 
-      done = true
-      tests.each do |test|
-        done = test.done?
-        break unless done
-      end
-
-      if done
+      if tests.detect { |test| !test.done? }
+        wait_seconds = 15
+        wait_seconds.downto(0) do |i|
+          puts "Sleeping #{i} seconds"
+          sleep 1
+        end
+      else
         puts "ALL TESTS PROCESSED, SHUTTING DOWN".fg 'green'
         exit 0
-      end
-
-      wait_seconds = 15
-      (1..wait_seconds).each do |i|
-        print "Sleeping #{wait_seconds- i} seconds\r"
-        sleep 1
       end
     end
   end
