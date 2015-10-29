@@ -7,7 +7,7 @@ require 'pry'
 require 'pry-byebug'
 
 class Test
-  attr_accessor :percepts, :jclient, :rsclien, :opts
+  attr_accessor :percepts, :jclient, :rsclient, :opts
   attr_accessor :stage, :thresholds, :cloud_name
   extend Forwardable
   def_delegators :@stage, :process
