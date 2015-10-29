@@ -141,8 +141,7 @@ class Test
   end
 
   def total_deps_up(filter)
-    deployments = @rsclient.deployments.index(filter: ["name==#{filter}"])
-    deployments.length
+    deployments = @rsclient.deployments.index(filter: ["name==#{filter}"]).length
   end
 
   def build_jenkins_job(job_name, wait_seconds)
