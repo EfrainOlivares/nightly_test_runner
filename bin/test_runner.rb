@@ -19,7 +19,7 @@ class Test
     @rsclient = rsclient
     elems = test_in_string_format.split(' ')
     @percepts = {}
-    if elems.length == 1
+    if elems.size == 1
       @name = test_in_string_format.chomp
       update_percepts
       if opts[:force_run] == false && @percepts[:job_status] == "success"
@@ -29,7 +29,7 @@ class Test
         puts "New test, set to Staging".fg 'yellow'
         @stage = Staging
       end
-    elsif elems.length == 5
+    elsif elems.size == 5
       @stage  = eval elems[0]
       @name   = elems[1]
       @percepts[:dup]    = elems[2]
@@ -41,7 +41,7 @@ class Test
         - single word for name of test
         - 5 words with stage, name, depstatus, jobstatus, destroystatus
         -
-        Received #{elems.length} words in test_in_string_format.
+        Received #{elems.size} words in test_in_string_format.
         -
         #{test_in_string_format}
       ERRORMSG
@@ -141,15 +141,15 @@ class Test
   end
 
   def total_deps_up(filter)
-    deployments = @rsclient.deployments.index(filter: ["name==#{filter}"]).length
+    deployments = @rsclient.deployments.index(filter: ["name==#{filter}"]).size
   end
 
   def build_jenkins_job(job_name, wait_seconds)
-    current_launches = @jclient.job.get_builds(job_name).length
+    current_launches = @jclient.job.get_builds(job_name).size
     @jclient.job.build(job_name)
     (wait_seconds..0).each do |i|
       print "Waiting #{i.abs} for #{job_name} to start\r"
-      new_launches = @jclient.job.get_builds(job_name).length
+      new_launches = @jclient.job.get_builds(job_name).size
       if current_launches +1 == new_launches
          puts "Registered new build for #{job_name}".fg 'yellow'
          return

@@ -50,7 +50,7 @@ class Matrix
 
   def check
     puts "PREFIX: #{@prefix}".fg 'yellow'
-    puts "Jobs: #{@jobs.length} including destroyers".fg 'yellow'
+    puts "Jobs: #{@jobs.size} including destroyers".fg 'yellow'
   end
 
   def select(regex, status = "any")
