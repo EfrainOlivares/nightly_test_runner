@@ -47,10 +47,12 @@ class Matrix
     @jobs = @client.job.list_all.reject { |job| job =~ /#{@prefix}_000/ || job !~ /rl10/ }
     @jobs.nil? ? (raise "MATRIX RELOAD FAILED!") : info("MATRIX RELOADED!")
   end
+
   def check
     puts "PREFIX: #{@prefix}".fg 'yellow'
     puts "Jobs: #{@jobs.length} including destroyers".fg 'yellow'
   end
+
   def select(regex, status = "any")
     case status
     when "any"
@@ -60,10 +62,12 @@ class Matrix
     end
     self
   end
+
   def show
     @temp_jobs.each { |job| puts job.fg 'yellow' }
     nil
   end
+
   def clear
     @temp_jobs = nil
     info "Cleared temp jobs, nothing to do"
@@ -75,9 +79,11 @@ class Matrix
   def countdown(seconds)
     seconds.times { |i| print "countdown: #{seconds - i}  ".fg 'green'; print "\r"; sleep 1 }
   end
+
   def info(str)
     puts str.fg 'green'
   end
+
   def action(act, gap)
     @temp_jobs.each do |job|
       @debug ? info("DEBUG: #{act} #{job}") : @client.job.method(act.to_sym).call(job)
@@ -85,7 +91,6 @@ class Matrix
       countdown(gap)
     end
   end
-
 end
 
 matrix = Matrix.new(@client_opts, @prefix)
