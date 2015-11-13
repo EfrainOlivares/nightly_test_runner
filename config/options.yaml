@@ -4,8 +4,8 @@
 :thresholds: {
   Google_Silicon: 5,
   AWS_ORG: 5,
-  VScale_VMW: 0,
-  SL_DAL: 0,
-  OST_JUN: 0
+  VScale_VMW: 5,
+  SL_DAL: 5,
+  OST_JUN: 5
 }
 :force_run: true
