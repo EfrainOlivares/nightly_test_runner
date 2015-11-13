@@ -22,7 +22,7 @@ class Test
 
     elems = test_in_string_format.split(' ')
     @percepts = {}
-    if elems.length == 1
+    if elems.size == 1
       @name = test_in_string_format.chomp
       @cloud_name = cloud_name(@name)
       if @thresholds.has_key?(@cloud_name) && (@thresholds[@cloud_name] == 0)
@@ -38,7 +38,7 @@ class Test
             @stage = Staging
         end
       end
-    elsif elems.length == 7
+    elsif elems.size == 7
       @stage  = eval elems[0]
       @percepts[:build] = elems[6]
       @percepts[:build_id] = elems[5]
@@ -55,7 +55,7 @@ class Test
           - single word for name of test
           - 7 words with stage, name, depstatus, jobstatus, destroystatus, build_id, build
           -
-          Received #{elems.length} words in string.
+          Received #{elems.size} words in string.
           -
           #{string}
         ERRORMSG
