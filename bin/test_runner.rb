@@ -7,41 +7,43 @@ require 'pry'
 require 'pry-byebug'
 
 class Test
-  attr_accessor :percepts, :jclient, :rsclien, :opts
+  attr_accessor :percepts, :jclient, :rsclient, :opts
   attr_accessor :stage, :thresholds, :cloud_name
   extend Forwardable
   def_delegators :@stage, :process
 
-  def initialize(string, jclient, rsclient, opts)
+  # test_in_string_format is a representation of the test state.
+  # It's elements are stage, name, deployment status, jenkins job status, jenkins destroyer status
+  def initialize(test_in_string_format, jclient, rsclient, opts)
     @jclient = jclient
     @rsclient = rsclient
-    elems = string.split(' ')
+    elems = test_in_string_format.split(' ')
     @percepts = {}
-    if elems.length == 1
-      @name = string.chomp
+    if elems.size == 1
+      @name = test_in_string_format.chomp
       update_percepts
-      if opts[:run_anyway] == false && @percepts[:job_status] == "success"
-        puts "run_always flag not off, and test passsed, going straight to Done".fg 'yellow'
+      if opts[:force_run] == false && @percepts[:job_status] == "success"
+        puts "force_run flag not off, and test passed, going straight to Done".fg 'yellow'
         @stage = Done
       else
         puts "New test, set to Staging".fg 'yellow'
         @stage = Staging
       end
-    elsif elems.length == 5
+    elsif elems.size == 5
       @stage  = eval elems[0]
       @name   = elems[1]
       @percepts[:dup]    = elems[2]
       @percepts[:job_status] = elems[3]
-      @percepts[:des_status]   = elems[4]
+      @percepts[:destroyer_status]   = elems[4]
     else
       error_mssg = <<-ERRORMSG.gsub(/^\s*/, "")
-        ERROR:  Invalid string formation. todo strings should be one of
+        ERROR:  Invalid test_in_string_format formation. job test_in_string_formats should be one of
         - single word for name of test
         - 5 words with stage, name, depstatus, jobstatus, destroystatus
         -
-        Received #{elems.length} words in string.
+        Received #{elems.size} words in test_in_string_format.
         -
-        #{string}
+        #{test_in_string_format}
       ERRORMSG
       puts error_mssg.fg 'red'
       exit 1
@@ -56,7 +58,7 @@ class Test
   end
 
   def get_line
-    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:des_status]}"
+    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:destroyer_status]}"
   end
 
   def done?
@@ -66,7 +68,7 @@ class Test
   def update_percepts
     @percepts[:dup]        = is_up?
     @percepts[:job_status] = job_status
-    @percepts[:des_status] = des_status
+    @percepts[:destroyer_status] = destroyer_status
 
     puts "#{@stage} #{@name} #{@percepts.inspect}".fg 'yellow'
   end
@@ -75,7 +77,7 @@ class Test
     @jclient.job.get_current_build_status(@name)
   end
 
-  def des_status
+  def destroyer_status
     @jclient.job.get_current_build_status("Z_#{@name}")
   end
 
@@ -83,7 +85,7 @@ class Test
     if @thresholds.has_key? @cloud_name
       allowed = @thresholds[@cloud_name]
       current =  total_deps_up("#{@prefix}_#{@cloud_name}")
-      if current <= allowed
+      if current < allowed
         puts "Threshold clear, currently #{current} up out of #{allowed}".fg 'yellow'
         launch_job
       else
@@ -129,20 +131,25 @@ class Test
   private
 
   def cloud_name(name)
+    # The rocket monkey naming convention goes like this:
+    # prefix_cloud_region_testname...
+    # What this test calls cloud name is actually 'cloud_region'
+    # So split on _ and get those two, for example.
+    # rl10lin_Google_Silicon_monitoring...
+    # yields 'Google_Silicon' as cloud name.
     name.split('_')[1..2].join('_')
   end
 
   def total_deps_up(filter)
-    deployments = @rsclient.deployments.index(filter: ["name==#{filter}"])
-    deployments.length
+    deployments = @rsclient.deployments.index(filter: ["name==#{filter}"]).size
   end
 
   def build_jenkins_job(job_name, wait_seconds)
-    current_launches = @jclient.job.get_builds(job_name).length
+    current_launches = @jclient.job.get_builds(job_name).size
     @jclient.job.build(job_name)
     (wait_seconds..0).each do |i|
       print "Waiting #{i.abs} for #{job_name} to start\r"
-      new_launches = @jclient.job.get_builds(job_name).length
+      new_launches = @jclient.job.get_builds(job_name).size
       if current_launches +1 == new_launches
          puts "Registered new build for #{job_name}".fg 'yellow'
          return
@@ -240,7 +247,7 @@ class DestroyAndRerun < BaseStage
     case
     when subset(percepts, job_status: "running")
       action(test, "abort_job")
-    when subset(percepts, des_status: "running")
+    when subset(percepts, destroyer_status: "running")
       action(test, "wait")
     when subset(percepts, dup: "up")
       action(test, "launch_destroyer")
@@ -266,17 +273,16 @@ class Runner
     raise unless @rsclient = rsclient
   end
 
-  def check_todo_list
-    raise "File location for todo list is nil" if options[:todo_file_location].nil?
-    puts "Loading #{@options[:todo_file_location]}"
+  def load_jobs_list
+    raise "File location for jobs list is nil" if @options[:jobs_file_location].nil?
+    puts "Loading #{@options[:jobs_file_location]}"
     begin
-      todo_list = File.readlines(@options[:todo_file_location])
+      jobs_list = File.readlines(@options[:jobs_file_location])
     rescue
-      puts "File not found"
-      exit
+      raise "File not found at #{@options[:jobs_file_location]}"
     end
     tests = []
-    todo_list.each do |item|
+    jobs_list.each do |item|
       next if (0 == (item =~ /\s+/)) # skip on empty lines
       tests << Test.new( item , @jclient, @rsclient, @options)
     end
@@ -286,10 +292,9 @@ class Runner
   def run
     ####  main running loop
     while true
-#      system "clear"
 
-      # load up the todo list
-      tests = check_todo_list
+      # load up the jobs list
+      tests = load_jobs_list
 
       # Iterate over and process each test
       tests.each do |test|
@@ -297,8 +302,8 @@ class Runner
         test.process
       end
 
-      # save updated todo list
-      File.open(@options[:todo_file_location], 'w') do |file|
+      # save updated jobs list
+      File.open(@options[:jobs_file_location], 'w') do |file|
         tests.each do |test|
           file.puts test.get_line
         end
@@ -306,21 +311,15 @@ class Runner
 
       # TODO: view current list now?
 
-      done = true
-      tests.each do |test|
-        done = test.done?
-        break unless done
-      end
-
-      if done
+      if tests.detect { |test| !test.done? }
+        wait_seconds = 15
+        wait_seconds.downto(0) do |i|
+          puts "Sleeping #{i} seconds"
+          sleep 1
+        end
+      else
         puts "ALL TESTS PROCESSED, SHUTTING DOWN".fg 'green'
         exit 0
-      end
-
-      wait_seconds = 15
-      (1..wait_seconds).each do |i|
-        print "Sleeping #{wait_seconds- i} seconds\r"
-        sleep 1
       end
     end
   end

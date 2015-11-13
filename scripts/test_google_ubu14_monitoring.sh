@@ -7,5 +7,5 @@ ls $JOB_DIR | grep -v 000 \
             | grep Google \
             | grep Ubu14 \
             | grep monitoring \
-            > ~/.test_runner/todo.txt
+            > ~/.test_runner/jobs.txt
 # insert `| sort -R` to get a random list
