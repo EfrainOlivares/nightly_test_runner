@@ -71,7 +71,7 @@ class Test
   end
 
   def get_line
-    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:des_status]} #{@percepts[:build_id]} #{@percepts[:build]}"
+    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:destroyer_status]} #{@percepts[:build_id]} #{@percepts[:build]}"
   end
 
   def done?
@@ -89,7 +89,7 @@ class Test
   def update_percepts
     @percepts[:dup]        = is_up?
     @percepts[:job_status] = job_status
-    @percepts[:des_status] = des_status
+    @percepts[:destroyer_status] = destroyer_status
     new_id = job_id
     delta = new_id.to_i - @percepts[:build_id].to_i
     unless delta == 0
