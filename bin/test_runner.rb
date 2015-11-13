@@ -17,40 +17,53 @@ class Test
   def initialize(test_in_string_format, jclient, rsclient, opts)
     @jclient = jclient
     @rsclient = rsclient
+    @opts = opts
+    @thresholds = @opts[:thresholds]
+
     elems = test_in_string_format.split(' ')
     @percepts = {}
     if elems.size == 1
       @name = test_in_string_format.chomp
-      update_percepts
-      if opts[:force_run] == false && @percepts[:job_status] == "success"
-        puts "force_run flag not off, and test passed, going straight to Done".fg 'yellow'
+      @cloud_name = cloud_name(@name)
+      if @thresholds.has_key?(@cloud_name) && (@thresholds[@cloud_name] == 0)
+        puts "Cloud #{@cloud_name} has threshold 0, moving to Done"
         @stage = Done
       else
-        puts "New test, set to Staging".fg 'yellow'
-        @stage = Staging
+        init_percepts
+        if opts[:run_anyway] == false && @percepts[:job_status] == "success"
+          puts "run_always flag not off, and test passsed, going straight to Done".fg 'yellow'
+          @stage = Done
+        else
+            puts "New test, set to Staging".fg 'yellow'
+            @stage = Staging
+        end
       end
-    elsif elems.size == 5
+    elsif elems.size == 7
       @stage  = eval elems[0]
+      @percepts[:build] = elems[6]
+      @percepts[:build_id] = elems[5]
       @name   = elems[1]
       @percepts[:dup]    = elems[2]
       @percepts[:job_status] = elems[3]
       @percepts[:destroyer_status]   = elems[4]
+      @cloud_name = cloud_name(@name)
     else
-      error_mssg = <<-ERRORMSG.gsub(/^\s*/, "")
-        ERROR:  Invalid test_in_string_format formation. job test_in_string_formats should be one of
-        - single word for name of test
-        - 5 words with stage, name, depstatus, jobstatus, destroystatus
-        -
-        Received #{elems.size} words in test_in_string_format.
-        -
-        #{test_in_string_format}
-      ERRORMSG
-      puts error_mssg.fg 'red'
-      exit 1
+      @stage = eval elems[0]
+      unless @stage == Done
+        error_mssg = <<-ERRORMSG.gsub(/^\s*/, "")
+          ERROR:  Invalid string formation. todo strings should be one of
+          - single word for name of test
+          - 7 words with stage, name, depstatus, jobstatus, destroystatus, build_id, build
+          -
+          Received #{elems.size} words in string.
+          -
+          #{string}
+        ERRORMSG
+        puts error_mssg.fg 'red'
+        exit 1
+      end
+      @name = elems[1]
     end
-    @opts = opts
-    @thresholds = @opts[:thresholds]
-    @cloud_name = cloud_name(@name)
   end # initialize
 
   def is_up?
@@ -58,19 +71,41 @@ class Test
   end
 
   def get_line
-    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:destroyer_status]}"
+    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:destroyer_status]} #{@percepts[:build_id]} #{@percepts[:build]}"
   end
 
   def done?
     @stage == Done || @stage == Failed || @stage == ErrorState
   end
 
+  def init_percepts
+    @percepts[:dup]        = is_up?
+    @percepts[:job_status] = job_status
+    @percepts[:destroyer_status] = destroyer_status
+    @percepts[:build_id]   = job_id
+    @percepts[:build]      = "same"
+  end
+
   def update_percepts
     @percepts[:dup]        = is_up?
     @percepts[:job_status] = job_status
     @percepts[:destroyer_status] = destroyer_status
-
+    new_id = job_id
+    delta = new_id.to_i - @percepts[:build_id].to_i
+    unless delta == 0
+      case
+      when delta == 1
+        @percepts[:build] = "next"
+        @percepts[:build_id] = new_id
+      when delta > 1
+        raise "ERROR: More than one build difference. last: #{@percepts[:build_id]} new: #{new_id}"
+      end
+    end
     puts "#{@stage} #{@name} #{@percepts.inspect}".fg 'yellow'
+  end
+
+  def job_id
+    @jclient.job.build_number(@name)
   end
 
   def job_status
@@ -89,8 +124,8 @@ class Test
         puts "Threshold clear, currently #{current} up out of #{allowed}".fg 'yellow'
         launch_job
       else
-        puts "Holding on #{@name} launch.".fg 'red'
-        puts "Hit allowed limit.  #{current} deployments out of #{allowed} running.".fg 'red'
+        puts "Holding on #{@name} launch.".fg 'yellow'
+        puts "Hit allowed limit.  #{current} deployments out of #{allowed} running.".fg 'yellow'
       end
     else
       puts "No limit on number of deployments found, launching #{@name}"
@@ -202,13 +237,16 @@ end
 class StageLaunch < BaseStage
   def self.process(test, percepts)
     case
-    when subset(percepts, dup: "up", job_status: "running")
+    when subset(percepts, build: "next", job_status: "running")
       transition(test, Running)
-    when subset(percepts, dup: "up", job_status: "failure")
+    when subset(percepts, build: "next", job_status: "failure")
+      action(test, "launch_destroyer")
       transition(test, Failed)
-    when subset(percepts, dup: "up", job_status: "aborted")
+    when subset(percepts, build: "next", job_status: "aborted")
       transition(test, ErrorState)
-    when subset(percepts, dup: "down")
+    when subset(percepts, build: "next", job_status: "success")
+      transition(test, Done)
+    when subset(percepts, build: "same", dup: "down")
       action(test, "launch_if_cleared")
     end
    end
@@ -291,6 +329,7 @@ class Runner
 
   def run
     ####  main running loop
+    # TODO: change this to loop-do when done with debugging
     while true
 
       # load up the jobs list
@@ -298,6 +337,7 @@ class Runner
 
       # Iterate over and process each test
       tests.each do |test|
+        next if test.done?
         test.update_percepts
         test.process
       end
