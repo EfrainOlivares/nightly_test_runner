@@ -142,7 +142,6 @@ class Test
          return true
        end
     end
-    raise "Timeout waiting for #{@name} deployment to be created"
   end
 
   def abort_job
