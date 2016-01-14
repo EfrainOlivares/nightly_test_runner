@@ -134,14 +134,18 @@ class Test
   end
 
   def launch_job
-    build_jenkins_job(@name, -3)
-    (-3..0).each do |i|
-       sleep 10
-       puts "Waiting for #{@name} to come up"
-       if is_up? == "up"
-         return true
-       end
+    build_status = build_jenkins_job(@name, 9)
+    unless build_status.nil?
+      (0..9).each do |i|
+         sleep 10
+         puts "Waiting for #{@name} to come up"
+         if is_up? == "up"
+           return true
+         end
+      end
+      puts "Timeout waiting for #{@name} deployment to be created".fg 'red'
     end
+    @percepts[:build] = "error"
   end
 
   def abort_job
@@ -151,7 +155,7 @@ class Test
     @jclient.job.abort("Z_#{@name}")
   end
   def launch_destroyer
-    build_jenkins_job("Z_#{@name}", -3)
+    build_jenkins_job("Z_#{@name}", 3)
   end
 
   def process
@@ -181,16 +185,17 @@ class Test
   def build_jenkins_job(job_name, wait_seconds)
     current_launches = @jclient.job.get_builds(job_name).size
     @jclient.job.build(job_name)
-    (wait_seconds..0).each do |i|
-      print "Waiting #{i.abs} for #{job_name} to start\r"
+    (0..wait_seconds).each do |i|
+      print "Waiting #{wait_seconds - i} for #{job_name} to start\r"
       new_launches = @jclient.job.get_builds(job_name).size
       if current_launches +1 == new_launches
          puts "Registered new build for #{job_name}".fg 'yellow'
-         return
+         return new_launches
       end
       sleep 10
     end
     puts "Jenkins job did not launch in #{wait_seconds} for #{job_name}".fg 'red'
+    return nil
   end
 end
 
@@ -245,6 +250,8 @@ class StageLaunch < BaseStage
       transition(test, ErrorState)
     when subset(percepts, build: "next", job_status: "success")
       transition(test, Done)
+    when subset(percepts, build: "error", dup: "down")
+      transition(test, ErrorState)
     when subset(percepts, build: "same", dup: "down")
       action(test, "launch_if_cleared")
     end
@@ -369,5 +376,7 @@ options = YAML.load_file(File.expand_path("~/.test_runner/options.yaml"))
 jclient = JenkinsApi::Client.new(YAML.load_file(File.expand_path("~/.jenkins_api_client/login.yml")))
 rsclient = RightApi::Client.new(YAML.load_file(File.expand_path('~/.right_api_client/login_test_runner.yml', __FILE__)))
 
+puts "Entered runner script"
 runner = Runner.new(options, jclient, rsclient)
+puts "About to start run"
 runner.run
