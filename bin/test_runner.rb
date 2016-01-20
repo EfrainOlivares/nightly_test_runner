@@ -8,7 +8,7 @@ require 'pry-byebug'
 
 class Test
   attr_accessor :percepts, :jclient, :rsclient, :opts
-  attr_accessor :stage, :thresholds, :cloud_name
+  attr_accessor :stage, :thresholds, :cloud_name, :prefix
   extend Forwardable
   def_delegators :@stage, :process
 
@@ -19,6 +19,7 @@ class Test
     @rsclient = rsclient
     @opts = opts
     @thresholds = @opts[:thresholds]
+    @prefix = @opts[:prefix]
 
     elems = test_in_string_format.split(' ')
     @percepts = {}
@@ -105,15 +106,27 @@ class Test
   end
 
   def job_id
+    tries ||= 5
     @jclient.job.build_number(@name)
+  rescue
+    sleep 1
+    ((tries -= 1) > 0) ? retry : (puts "jenkins client exception, retrying")
   end
 
   def job_status
+    tries ||= 5
     @jclient.job.get_current_build_status(@name)
+  rescue
+    sleep 1
+    ((tries -= 1) > 0) ? retry : (puts "jenkins client exception, retrying")
   end
 
   def destroyer_status
+    tries ||= 5
     @jclient.job.get_current_build_status("Z_#{@name}")
+  rescue
+    sleep 1
+    ((tries -= 1) > 0) ? retry : (puts "jenkins client exception, retrying")
   end
 
   def launch_if_cleared
@@ -179,7 +192,11 @@ class Test
   end
 
   def total_deps_up(filter)
+    tries ||= 5
     deployments = @rsclient.deployments.index(filter: ["name==#{filter}"]).size
+  rescue
+    sleep 1
+    (tries -= 1) > 0 ? retry : (puts "RightApi client exception, retrying")
   end
 
   def build_jenkins_job(job_name, wait_seconds)
