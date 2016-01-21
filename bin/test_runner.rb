@@ -203,7 +203,9 @@ class Test
     jenkins_client_job(:build, job_name)
     (0..wait_seconds).each do |i|
       print "Waiting #{wait_seconds - i} for #{job_name} to start\r"
-      new_launches = jenkins_client_job(:get_builds, job_name).size
+      arr_new_launches = jenkins_client_job(:get_builds, job_name)
+      next if arr_new_launches.nil?
+      new_launches = arr_new_launches.size
       if current_launches +1 == new_launches
          puts "Registered new build for #{job_name}".fg 'yellow'
          return new_launches
