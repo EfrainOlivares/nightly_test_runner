@@ -58,7 +58,7 @@ class Test
           -
           Received #{elems.size} words in string.
           -
-          #{string}
+          #{elems.inspect}
         ERRORMSG
         puts error_mssg.fg 'red'
         exit 1
@@ -106,27 +106,15 @@ class Test
   end
 
   def job_id
-    tries ||= 5
-    @jclient.job.build_number(@name)
-  rescue
-    sleep 1
-    ((tries -= 1) > 0) ? retry : (puts "jenkins client exception, retrying")
+    jenkins_client_job(:build_number, @name)
   end
 
   def job_status
-    tries ||= 5
-    @jclient.job.get_current_build_status(@name)
-  rescue
-    sleep 1
-    ((tries -= 1) > 0) ? retry : (puts "jenkins client exception, retrying")
+    jenkins_client_job(:get_current_build_status, @name)
   end
 
   def destroyer_status
-    tries ||= 5
-    @jclient.job.get_current_build_status("Z_#{@name}")
-  rescue
-    sleep 1
-    ((tries -= 1) > 0) ? retry : (puts "jenkins client exception, retrying")
+    jenkins_client_job(:get_current_build_status, "Z_#{@name}")
   end
 
   def launch_if_cleared
@@ -162,11 +150,13 @@ class Test
   end
 
   def abort_job
-    @jclient.job.abort(@name)
+    jenkins_client_job(:abort, "#{@name}")
   end
+
   def abort_destroyer
-    @jclient.job.abort("Z_#{@name}")
+    jenkins_client_job(:abort, "Z_#{@name}")
   end
+
   def launch_destroyer
     build_jenkins_job("Z_#{@name}", 3)
   end
@@ -180,6 +170,15 @@ class Test
   end
 
   private
+
+  def jenkins_client_job(command, arg)
+    tries ||= 5
+    @jclient.job.send(command, arg)
+  rescue
+    sleep 1
+    puts "Retrying jenkins api command #{command}"
+    (tries -= 1) > 0 ? retry : (puts "Jenkins client exception, retrying")
+  end
 
   def cloud_name(name)
     # The rocket monkey naming convention goes like this:
@@ -201,10 +200,10 @@ class Test
 
   def build_jenkins_job(job_name, wait_seconds)
     current_launches = @jclient.job.get_builds(job_name).size
-    @jclient.job.build(job_name)
+    jenkins_client_job(:build, job_name)
     (0..wait_seconds).each do |i|
       print "Waiting #{wait_seconds - i} for #{job_name} to start\r"
-      new_launches = @jclient.job.get_builds(job_name).size
+      new_launches = jenkins_client_job(:get_builds, job_name).size
       if current_launches +1 == new_launches
          puts "Registered new build for #{job_name}".fg 'yellow'
          return new_launches
