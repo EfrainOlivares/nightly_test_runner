@@ -26,17 +26,17 @@ class Test
     if elems.size == 1
       @name = test_in_string_format.chomp
       @cloud_name = cloud_name(@name)
-      if @thresholds.has_key?(@cloud_name) && (@thresholds[@cloud_name] == 0)
+      if @thresholds.key?(@cloud_name) && (@thresholds[@cloud_name] == 0)
         puts "Cloud #{@cloud_name} has threshold 0, moving to Done"
         @stage = Done
       else
         init_percepts
-        if opts[:run_anyway] == false && @percepts[:job_status] == "success"
-          puts "run_always flag not off, and test passsed, going straight to Done".fg 'yellow'
+        if opts[:run_anyway] == false && @percepts[:job_status] == 'success'
+          puts 'run_always flag not off, and test passsed, going straight to Done'.fg 'yellow'
           @stage = Done
         else
-            puts "New test, set to Staging".fg 'yellow'
-            @stage = Staging
+          puts 'New test, set to Staging'.fg 'yellow'
+          @stage = Staging
         end
       end
     elsif elems.size == 7
@@ -51,7 +51,7 @@ class Test
     else
       @stage = eval elems[0]
       unless @stage == Done
-        error_mssg = <<-ERRORMSG.gsub(/^\s*/, "")
+        error_mssg = <<-ERRORMSG.gsub(/^\s*/, '')
           ERROR:  Invalid string formation. todo strings should be one of
           - single word for name of test
           - 7 words with stage, name, depstatus, jobstatus, destroystatus, build_id, build
@@ -68,11 +68,11 @@ class Test
   end # initialize
 
   def is_up?
-    @rsclient.deployments.index(:filter => ["name==#{@name}"]).empty? ? "down" : "up"
+    @rsclient.deployments.index(filter: ["name==#{@name}"]).empty? ? 'down' : 'up'
   end
 
   def get_line
-    return "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:destroyer_status]} #{@percepts[:build_id]} #{@percepts[:build]}"
+    "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:destroyer_status]} #{@percepts[:build_id]} #{@percepts[:build]}"
   end
 
   def done?
@@ -84,7 +84,7 @@ class Test
     @percepts[:job_status] = job_status
     @percepts[:destroyer_status] = destroyer_status
     @percepts[:build_id]   = job_id
-    @percepts[:build]      = "same"
+    @percepts[:build]      = 'same'
   end
 
   def update_percepts
@@ -96,7 +96,7 @@ class Test
     unless delta == 0
       case
       when delta == 1
-        @percepts[:build] = "next"
+        @percepts[:build] = 'next'
         @percepts[:build_id] = new_id
       when delta > 1
         raise "ERROR: More than one build difference. last: #{@percepts[:build_id]} new: #{new_id}"
@@ -118,7 +118,7 @@ class Test
   end
 
   def launch_if_cleared
-    if @thresholds.has_key? @cloud_name
+    if @thresholds.key? @cloud_name
       allowed = @thresholds[@cloud_name]
       current =  total_deps_up("#{@prefix}_#{@cloud_name}")
       if current < allowed
@@ -137,16 +137,16 @@ class Test
   def launch_job
     build_status = build_jenkins_job(@name, 9)
     unless build_status.nil?
-      (0..9).each do |i|
-         sleep 10
-         puts "Waiting for #{@name} to come up"
-         if is_up? == "up"
-           return true
-         end
+      (0..9).each do |_i|
+        sleep 10
+        puts "Waiting for #{@name} to come up"
+        if is_up? == 'up'
+          return true
+        end
       end
       puts "Timeout waiting for #{@name} deployment to be created".fg 'red'
     end
-    @percepts[:build] = "error"
+    @percepts[:build] = 'error'
   end
 
   def abort_job
@@ -166,7 +166,7 @@ class Test
   end
 
   def wait
-    puts "No-op waiting".fg 'light-blue'
+    puts 'No-op waiting'.fg 'light-blue'
   end
 
   private
@@ -177,7 +177,7 @@ class Test
   rescue
     sleep 1
     puts "Retrying jenkins api command #{command}"
-    (tries -= 1) > 0 ? retry : (puts "Jenkins client exception, retrying")
+    (tries -= 1) > 0 ? retry : (puts 'Jenkins client exception, retrying')
   end
 
   def cloud_name(name)
@@ -195,7 +195,7 @@ class Test
     deployments = @rsclient.deployments.index(filter: ["name==#{filter}"]).size
   rescue
     sleep 1
-    (tries -= 1) > 0 ? retry : (puts "RightApi client exception, retrying")
+    (tries -= 1) > 0 ? retry : (puts 'RightApi client exception, retrying')
   end
 
   def build_jenkins_job(job_name, wait_seconds)
@@ -206,20 +206,20 @@ class Test
       arr_new_launches = jenkins_client_job(:get_builds, job_name)
       next if arr_new_launches.nil?
       new_launches = arr_new_launches.size
-      if current_launches +1 == new_launches
-         puts "Registered new build for #{job_name}".fg 'yellow'
-         return new_launches
+      if current_launches + 1 == new_launches
+        puts "Registered new build for #{job_name}".fg 'yellow'
+        return new_launches
       end
       sleep 10
     end
     puts "Jenkins job did not launch in #{wait_seconds} for #{job_name}".fg 'red'
-    return nil
+    nil
   end
 end
 
 class BaseStage
   def self.subset(_opts, sub)
-    subset = _opts.select { |k,v| sub.keys.include? k }
+    subset = _opts.select { |k, _v| sub.keys.include? k }
     subset == sub
   end
 
@@ -231,7 +231,7 @@ class BaseStage
   end
 
   def self.process(test, percepts)
-    raise "Base processing default should never be called"
+    raise 'Base processing default should never be called'
   end
 
   def self.transition(test, stage)
@@ -248,9 +248,9 @@ end
 class Staging < BaseStage
   def self.process(test, percepts)
     case
-    when any(percepts, dup: "up", job_status: "running")
+    when any(percepts, dup: 'up', job_status: 'running')
       transition(test, DestroyAndRerun)
-    when subset(percepts, dup: "down")
+    when subset(percepts, dup: 'down')
       transition(test, StageLaunch)
     end
   end
@@ -259,19 +259,19 @@ end
 class StageLaunch < BaseStage
   def self.process(test, percepts)
     case
-    when subset(percepts, build: "next", job_status: "running")
+    when subset(percepts, build: 'next', job_status: 'running')
       transition(test, Running)
-    when subset(percepts, build: "next", job_status: "failure")
-      action(test, "launch_destroyer")
+    when subset(percepts, build: 'next', job_status: 'failure')
+      action(test, 'launch_destroyer')
       transition(test, Failed)
-    when subset(percepts, build: "next", job_status: "aborted")
+    when subset(percepts, build: 'next', job_status: 'aborted')
       transition(test, ErrorState)
-    when subset(percepts, build: "next", job_status: "success")
+    when subset(percepts, build: 'next', job_status: 'success')
       transition(test, Done)
-    when subset(percepts, build: "error", dup: "down")
+    when subset(percepts, build: 'error', dup: 'down')
       transition(test, ErrorState)
-    when subset(percepts, build: "same", dup: "down")
-      action(test, "launch_if_cleared")
+    when subset(percepts, build: 'same', dup: 'down')
+      action(test, 'launch_if_cleared')
     end
    end
 end
@@ -279,16 +279,16 @@ end
 class Running < BaseStage
   def self.process(test, percepts)
     case
-    when subset(percepts, job_status: "aborted")
+    when subset(percepts, job_status: 'aborted')
       transition(test, ErrorState)
-    when subset(percepts, job_status: "running")
-      action(test, "wait")
-    when subset(percepts, job_status: "success")
+    when subset(percepts, job_status: 'running')
+      action(test, 'wait')
+    when subset(percepts, job_status: 'success')
       transition(test, Done)
-    when subset(percepts, dup: "up", job_status: "failure")
-      action(test, "launch_destroyer")
+    when subset(percepts, dup: 'up', job_status: 'failure')
+      action(test, 'launch_destroyer')
       transition(test, Failed)
-    when subset(percepts, dup: "down", job_status: "failure")
+    when subset(percepts, dup: 'down', job_status: 'failure')
       transition(test, Failed)
     end
   end
@@ -307,13 +307,13 @@ end
 class DestroyAndRerun < BaseStage
   def self.process(test, percepts)
     case
-    when subset(percepts, job_status: "running")
-      action(test, "abort_job")
-    when subset(percepts, destroyer_status: "running")
-      action(test, "wait")
-    when subset(percepts, dup: "up")
-      action(test, "launch_destroyer")
-    when subset(percepts, dup: "down")
+    when subset(percepts, job_status: 'running')
+      action(test, 'abort_job')
+    when subset(percepts, destroyer_status: 'running')
+      action(test, 'wait')
+    when subset(percepts, dup: 'up')
+      action(test, 'launch_destroyer')
+    when subset(percepts, dup: 'down')
       transition(test, Staging)
     end
   end
@@ -323,7 +323,6 @@ class Done < BaseStage
   def self.process(test, percepts)
   end
 end
-
 
 ###############################################################################
 # Global functions, and main loop
@@ -336,7 +335,7 @@ class Runner
   end
 
   def load_jobs_list
-    raise "File location for jobs list is nil" if @options[:jobs_file_location].nil?
+    raise 'File location for jobs list is nil' if @options[:jobs_file_location].nil?
     puts "Loading #{@options[:jobs_file_location]}"
     begin
       jobs_list = File.readlines(@options[:jobs_file_location])
@@ -346,7 +345,7 @@ class Runner
     tests = []
     jobs_list.each do |item|
       next if (0 == (item =~ /\s+/)) # skip on empty lines
-      tests << Test.new( item , @jclient, @rsclient, @options)
+      tests << Test.new(item, @jclient, @rsclient, @options)
     end
     tests
   end
@@ -354,8 +353,7 @@ class Runner
   def run
     ####  main running loop
     # TODO: change this to loop-do when done with debugging
-    while true
-
+    loop do
       # load up the jobs list
       tests = load_jobs_list
 
@@ -382,19 +380,18 @@ class Runner
           sleep 1
         end
       else
-        puts "ALL TESTS PROCESSED, SHUTTING DOWN".fg 'green'
+        puts 'ALL TESTS PROCESSED, SHUTTING DOWN'.fg 'green'
         exit 0
       end
     end
   end
 end
 
-
-options = YAML.load_file(File.expand_path("~/.test_runner/options.yaml"))
-jclient = JenkinsApi::Client.new(YAML.load_file(File.expand_path("~/.jenkins_api_client/login.yml")))
+options = YAML.load_file(File.expand_path('~/.test_runner/options.yaml'))
+jclient = JenkinsApi::Client.new(YAML.load_file(File.expand_path('~/.jenkins_api_client/login.yml')))
 rsclient = RightApi::Client.new(YAML.load_file(File.expand_path('~/.right_api_client/login_test_runner.yml', __FILE__)))
 
-puts "Entered runner script"
+puts 'Entered runner script'
 runner = Runner.new(options, jclient, rsclient)
-puts "About to start run"
+puts 'About to start run'
 runner.run

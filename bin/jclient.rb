@@ -17,7 +17,7 @@ require 'tco'
 #
 # This repo is still a WIP
 
-@client_opts = YAML.load_file(File.expand_path("~/.jenkins_api_client/login.yml"))
+@client_opts = YAML.load_file(File.expand_path('~/.jenkins_api_client/login.yml'))
 @prefix = 'rl10'
 
 class Matrix
@@ -33,11 +33,11 @@ class Matrix
     @client = JenkinsApi::Client.new(opts)
     @prefix = prefix
     @jobs = @client.job.list_all.reject { |job| job =~ /#{@prefix}_000/ || job !~ /rl10/ }
-    raise "No jobs retrieved" if @jobs.nil?
-    self.check
+    raise 'No jobs retrieved' if @jobs.nil?
+    check
   end
 
-  ['build', 'enable', 'disable'].each do |meth|
+  %w(build enable disable).each do |meth|
     define_method(meth) do |arg|
       action(meth, arg)
     end
@@ -45,7 +45,7 @@ class Matrix
 
   def reload
     @jobs = @client.job.list_all.reject { |job| job =~ /#{@prefix}_000/ || job !~ /rl10/ }
-    @jobs.nil? ? (raise "MATRIX RELOAD FAILED!") : info("MATRIX RELOADED!")
+    @jobs.nil? ? (raise 'MATRIX RELOAD FAILED!') : info('MATRIX RELOADED!')
   end
 
   def check
@@ -53,11 +53,11 @@ class Matrix
     puts "Jobs: #{@jobs.size} including destroyers".fg 'yellow'
   end
 
-  def select(regex, status = "any")
+  def select(regex, status = 'any')
     case status
-    when "any"
+    when 'any'
       @temp_jobs = @jobs.select { |job| job =~ /#{regex}/ }
-    when "not_green"
+    when 'not_green'
       @temp_jobs = @jobs.select { |job| job =~ /#{regex}/ && @client.job.status(job) != 'success' }
     end
     self
@@ -70,12 +70,12 @@ class Matrix
 
   def clear
     @temp_jobs = nil
-    info "Cleared temp jobs, nothing to do"
+    info 'Cleared temp jobs, nothing to do'
     nil
   end
 
-
   private
+
   def countdown(seconds)
     seconds.times { |i| print "countdown: #{seconds - i}  ".fg 'green'; print "\r"; sleep 1 }
   end
