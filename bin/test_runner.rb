@@ -6,334 +6,39 @@ require 'tco'
 require 'pry'
 require 'pry-byebug'
 
-class Test
-  attr_accessor :percepts, :jclient, :rsclient, :opts
-  attr_accessor :stage, :thresholds, :cloud_name, :prefix
-  extend Forwardable
-  def_delegators :@stage, :process
+require_relative '../lib/test'
+require_relative '../lib/stage'
 
-  # test_in_string_format is a representation of the test state.
-  # It's elements are stage, name, deployment status, jenkins job status, jenkins destroyer status
-  def initialize(test_in_string_format, jclient, rsclient, opts)
-    @jclient = jclient
-    @rsclient = rsclient
-    @opts = opts
-    @thresholds = @opts[:thresholds]
-    @prefix = @opts[:prefix]
-
-    elems = test_in_string_format.split(' ')
-    @percepts = {}
-    if elems.size == 1
-      @name = test_in_string_format.chomp
-      @cloud_name = cloud_name(@name)
-      if @thresholds.key?(@cloud_name) && (@thresholds[@cloud_name] == 0)
-        puts "Cloud #{@cloud_name} has threshold 0, moving to Done"
-        @stage = Done
-      else
-        init_percepts
-        if opts[:run_anyway] == false && @percepts[:job_status] == 'success'
-          puts 'run_always flag not off, and test passsed, going straight to Done'.fg 'yellow'
-          @stage = Done
-        else
-          puts 'New test, set to Staging'.fg 'yellow'
-          @stage = Staging
-        end
-      end
-    elsif elems.size == 7
-      @stage  = eval elems[0]
-      @percepts[:build] = elems[6]
-      @percepts[:build_id] = elems[5]
-      @name   = elems[1]
-      @percepts[:dup]    = elems[2]
-      @percepts[:job_status] = elems[3]
-      @percepts[:destroyer_status]   = elems[4]
-      @cloud_name = cloud_name(@name)
-    else
-      @stage = eval elems[0]
-      unless @stage == Done
-        error_mssg = <<-ERRORMSG.gsub(/^\s*/, '')
-          ERROR:  Invalid string formation. todo strings should be one of
-          - single word for name of test
-          - 7 words with stage, name, depstatus, jobstatus, destroystatus, build_id, build
-          -
-          Received #{elems.size} words in string.
-          -
-          #{elems.inspect}
-        ERRORMSG
-        puts error_mssg.fg 'red'
-        exit 1
-      end
-      @name = elems[1]
-    end
-  end # initialize
-
-  def is_up?
-    @rsclient.deployments.index(filter: ["name==#{@name}"]).empty? ? 'down' : 'up'
-  end
-
-  def get_line
-    "#{@stage} #{@name} #{@percepts[:dup]} #{@percepts[:job_status]} #{@percepts[:destroyer_status]} #{@percepts[:build_id]} #{@percepts[:build]}"
-  end
-
-  def done?
-    @stage == Done || @stage == Failed || @stage == ErrorState
-  end
-
-  def init_percepts
-    @percepts[:dup]        = is_up?
-    @percepts[:job_status] = job_status
-    @percepts[:destroyer_status] = destroyer_status
-    @percepts[:build_id]   = job_id
-    @percepts[:build]      = 'same'
-  end
-
-  def update_percepts
-    @percepts[:dup]        = is_up?
-    @percepts[:job_status] = job_status
-    @percepts[:destroyer_status] = destroyer_status
-    new_id = job_id
-    delta = new_id.to_i - @percepts[:build_id].to_i
-    unless delta == 0
-      case
-      when delta == 1
-        @percepts[:build] = 'next'
-        @percepts[:build_id] = new_id
-      when delta > 1
-        raise "ERROR: More than one build difference. last: #{@percepts[:build_id]} new: #{new_id}"
-      end
-    end
-    puts "#{@stage} #{@name} #{@percepts.inspect}".fg 'yellow'
-  end
-
-  def job_id
-    jenkins_client_job(:build_number, @name)
-  end
-
-  def job_status
-    jenkins_client_job(:get_current_build_status, @name)
-  end
-
-  def destroyer_status
-    jenkins_client_job(:get_current_build_status, "Z_#{@name}")
-  end
-
-  def launch_if_cleared
-    if @thresholds.key? @cloud_name
-      allowed = @thresholds[@cloud_name]
-      current =  total_deps_up("#{@prefix}_#{@cloud_name}")
-      if current < allowed
-        puts "Threshold clear, currently #{current} up out of #{allowed}".fg 'yellow'
-        launch_job
-      else
-        puts "Holding on #{@name} launch.".fg 'yellow'
-        puts "Hit allowed limit.  #{current} deployments out of #{allowed} running.".fg 'yellow'
-      end
-    else
-      puts "No limit on number of deployments found, launching #{@name}"
-      launch_job
-    end
-  end
-
-  def launch_job
-    build_status = build_jenkins_job(@name, 9)
-    unless build_status.nil?
-      (0..9).each do |_i|
-        sleep 10
-        puts "Waiting for #{@name} to come up"
-        if is_up? == 'up'
-          return true
-        end
-      end
-      puts "Timeout waiting for #{@name} deployment to be created".fg 'red'
-    end
-    @percepts[:build] = 'error'
-  end
-
-  def abort_job
-    jenkins_client_job(:abort, "#{@name}")
-  end
-
-  def abort_destroyer
-    jenkins_client_job(:abort, "Z_#{@name}")
-  end
-
-  def launch_destroyer
-    build_jenkins_job("Z_#{@name}", 3)
-  end
-
-  def process
-    @stage.process(self, @percepts)
-  end
-
-  def wait
-    puts 'No-op waiting'.fg 'light-blue'
-  end
-
-  private
-
-  def jenkins_client_job(command, arg)
-    tries ||= 5
-    @jclient.job.send(command, arg)
-  rescue
-    sleep 1
-    puts "Retrying jenkins api command #{command}"
-    (tries -= 1) > 0 ? retry : (puts 'Jenkins client exception, retrying')
-  end
-
-  def cloud_name(name)
-    # The rocket monkey naming convention goes like this:
-    # prefix_cloud_region_testname...
-    # What this test calls cloud name is actually 'cloud_region'
-    # So split on _ and get those two, for example.
-    # rl10lin_Google_Silicon_monitoring...
-    # yields 'Google_Silicon' as cloud name.
-    name.split('_')[1..2].join('_')
-  end
-
-  def total_deps_up(filter)
-    tries ||= 5
-    deployments = @rsclient.deployments.index(filter: ["name==#{filter}"]).size
-  rescue
-    sleep 1
-    (tries -= 1) > 0 ? retry : (puts 'RightApi client exception, retrying')
-  end
-
-  def build_jenkins_job(job_name, wait_seconds)
-    current_launches = @jclient.job.get_builds(job_name).size
-    jenkins_client_job(:build, job_name)
-    (0..wait_seconds).each do |i|
-      print "Waiting #{wait_seconds - i} for #{job_name} to start\r"
-      arr_new_launches = jenkins_client_job(:get_builds, job_name)
-      next if arr_new_launches.nil?
-      new_launches = arr_new_launches.size
-      if current_launches + 1 == new_launches
-        puts "Registered new build for #{job_name}".fg 'yellow'
-        return new_launches
-      end
-      sleep 10
-    end
-    puts "Jenkins job did not launch in #{wait_seconds} for #{job_name}".fg 'red'
-    nil
-  end
-end
-
-class BaseStage
-  def self.subset(_opts, sub)
-    subset = _opts.select { |k, _v| sub.keys.include? k }
-    subset == sub
-  end
-
-  def self.any(_opts, matches)
-    matches.each do |key, _|
-      return true if _opts[key] == matches[key]
-    end
-    false
-  end
-
-  def self.process(test, percepts)
-    raise 'Base processing default should never be called'
-  end
-
-  def self.transition(test, stage)
-    puts "TRANSITION: #{self} => #{stage}".fg 'green'
-    test.stage = stage
-  end
-
-  def self.action(test, action)
-    puts "ACTION: #{self} stage, calling test.#{action}".fg 'green'
-    test.send(action)
-  end
-end
-
-class Staging < BaseStage
-  def self.process(test, percepts)
-    case
-    when any(percepts, dup: 'up', job_status: 'running')
-      transition(test, DestroyAndRerun)
-    when subset(percepts, dup: 'down')
-      transition(test, StageLaunch)
-    end
-  end
-end
-
-class StageLaunch < BaseStage
-  def self.process(test, percepts)
-    case
-    when subset(percepts, build: 'next', job_status: 'running')
-      transition(test, Running)
-    when subset(percepts, build: 'next', job_status: 'failure')
-      action(test, 'launch_destroyer')
-      transition(test, Failed)
-    when subset(percepts, build: 'next', job_status: 'aborted')
-      transition(test, ErrorState)
-    when subset(percepts, build: 'next', job_status: 'success')
-      transition(test, Done)
-    when subset(percepts, build: 'error', dup: 'down')
-      transition(test, ErrorState)
-    when subset(percepts, build: 'same', dup: 'down')
-      action(test, 'launch_if_cleared')
-    end
-   end
-end
-
-class Running < BaseStage
-  def self.process(test, percepts)
-    case
-    when subset(percepts, job_status: 'aborted')
-      transition(test, ErrorState)
-    when subset(percepts, job_status: 'running')
-      action(test, 'wait')
-    when subset(percepts, job_status: 'success')
-      transition(test, Done)
-    when subset(percepts, dup: 'up', job_status: 'failure')
-      action(test, 'launch_destroyer')
-      transition(test, Failed)
-    when subset(percepts, dup: 'down', job_status: 'failure')
-      transition(test, Failed)
-    end
-  end
-end
-
-class ErrorState < BaseStage
-  def self.process(test, percepts)
-  end
-end
-
-class Failed < BaseStage
-  def self.process(test, percepts)
-  end
-end
-
-class DestroyAndRerun < BaseStage
-  def self.process(test, percepts)
-    case
-    when subset(percepts, job_status: 'running')
-      action(test, 'abort_job')
-    when subset(percepts, destroyer_status: 'running')
-      action(test, 'wait')
-    when subset(percepts, dup: 'up')
-      action(test, 'launch_destroyer')
-    when subset(percepts, dup: 'down')
-      transition(test, Staging)
-    end
-  end
-end
-
-class Done < BaseStage
-  def self.process(test, percepts)
-  end
-end
-
-###############################################################################
-# Global functions, and main loop
+# Main class running loop.  Essentially a timed loop to keep the tests running.
+#   1. Read a file with the list of jobs to be run.
+#   2. Load a config file which has thresholds for each cloud.
+#   3. Load rightscale and jenkins clients
+#   4. Loop through Test objects, asking them to update and execute.
+#   5. Check if all tests are 'done'
+#   6. On each iteration, update list of running jobs to disk.
+#   7. Exit when all tests report 'done'
+#
+#   For maintainability sake, do NOT put ANY behavior or low level actions in this file.
+#   This file is concerned only with looping through the tests.
+#   All behavior in terms of job/test management is in lib/stage.rb
+#   All exeution, communication with jenkins/rightscale api's is in lib/test.rb
+#
 class Runner
   attr_accessor :options, :jclient, :rsclient
   def initialize(options, jclient, rsclient)
-    raise unless @options = options
-    raise unless @jclient = jclient
-    raise unless @rsclient = rsclient
+    @options = options
+    @jclient = jclient
+    @rsclient = rsclient
+
+    # If the options file or a client is missing, do not start.
+    raise unless @options
+    raise unless @jclient
+    raise unless @rsclient
   end
 
+  # Loads list of jobs to run.  Initially this is just a list of names, one per line for each job.
+  #     After the initial load, the file is saved on each iteration but has stage and jenkins
+  #     job status information.
   def load_jobs_list
     raise 'File location for jobs list is nil' if @options[:jobs_file_location].nil?
     puts "Loading #{@options[:jobs_file_location]}"
@@ -350,9 +55,14 @@ class Runner
     tests
   end
 
+  # Simple run loop.
+  #     1. Load up the file with job information
+  #     2. Call update, and process on each test.
+  #     3. Save current status back to the jobs file
+  #     4. Check if all tests are done, if not, sleep and iterate
+  #
   def run
     ####  main running loop
-    # TODO: change this to loop-do when done with debugging
     loop do
       # load up the jobs list
       tests = load_jobs_list
@@ -371,7 +81,12 @@ class Runner
         end
       end
 
-      # TODO: view current list now?
+      # save updated jobs list in json format
+      File.open(@options[:jobs_file_location].gsub('txt', 'json'), 'w') do |file|
+        tests.each do |test|
+          file.puts test.save_state_as_json
+        end
+      end
 
       if tests.detect { |test| !test.done? }
         wait_seconds = 15
@@ -386,6 +101,12 @@ class Runner
     end
   end
 end
+
+# Program start
+#     1. Load all creds for clients
+#     2. Create Runner object
+#     3. Start the runner.
+#
 
 options = YAML.load_file(File.expand_path('~/.test_runner/options.yaml'))
 jclient = JenkinsApi::Client.new(YAML.load_file(File.expand_path('~/.jenkins_api_client/login.yml')))
