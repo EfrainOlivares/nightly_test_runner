@@ -1,10 +1,12 @@
 # nightly_test_runner
 
 ## Pre-requisites
- * A VirtualMonkey vm up and running
- * It should have Jenkins running
- * The repo servertemplate\_qa\_test\_configiguration is cloned and you've setup the config files for RocketMonkey
- * Jenkins should be set up with a matrix for rightlinklite\_tests jobs
+ * A [VirtualMonkey](https://us-4.rightscale.com/acct/2901/server_templates/354717004#scripts) server up and running through the Boot Sequence.
+ * Run the Operational Script: [MONKEY_install_jenkins_RL10](https://us-4.rightscale.com/acct/2901/right_scripts/545186004)
+ * Run the Operational Script: [MONKEY_setup_rocketmonkey_RL10](https://us-4.rightscale.com/acct/2901/right_scripts/547189004)
+ * Run the Operational Script: [MONKEY_setup_nightly_automation_RL10](https://us-4.rightscale.com/acct/2901/right_scripts/550573004)
+ * The repo servertemplate\_qa\_test\_configuration is cloned and you've setup the config files for RocketMonkey
+ * Jenkins should a matrix loaded for rightlinklite\_tests jobs
 
 
 ## Setting up
