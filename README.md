@@ -8,7 +8,6 @@
  * The repo servertemplate\_qa\_test\_configuration is cloned and you've setup the config files for RocketMonkey
  * Jenkins should a matrix loaded for rightlinklite\_tests jobs
 
-
 ## The MONKEY_setup_nightly_automation_RL10 script above should have done the following:
  * Clone the repo to /root/nightly\_test\_runner
  * Run the setup.sh script
@@ -31,15 +30,17 @@ uses lib/stage.rb and lib/test.rb.  It will roughly take the following steps.
 ## What does it actually do?
 It is easier to think of what it does for one job first.
  * Check if job is runnable, (no deployment, job is stopped, destroyer is stopped).
- * If it is runnable, run the job.
+ * If it is not runnable, take appropriate actions until it is runnable.
+ * Once it is runnable, trigger the jenkins job
  * If the job is successful, mark it done.
  * If the job was a failure, run the destroyer and mark it done.
 
 It will do the above steps for every job on the list.  On the next level up it will...
  * Iterate through the list of jobs and gather state information about deployment, jobs status.
- * Take appropriate action for a job and move on to the next one.
- The runner will pick up each job, check if it is runnable (no deployment, no jenkins job running, no destroyer running), and then run the job in jenkins.  If it does not match the requirement, it will take actions to remove the deployment, stop the jenkins job etc until it is r
-
+ * Take appropriate action for a job and move on to the next one. (Say trigger destroyer, or run the job etc)
+ * Once it goes through the whole list, it saves status to file and goes to sleep.
+ * It will iterate over and over until all jobs are marked done.
+ 
 
 ## Running existing lists of jobs.
  * In the scripts folder, you'll find a couple of scripts to start nightly automation. The next section explains how they work.
