@@ -126,7 +126,8 @@ class Test
         @percepts[:build] = 'next'
         @percepts[:build_id] = new_id
       when delta > 1
-        raise "ERROR: More than one build difference. last: #{@percepts[:build_id]} new: #{new_id}"
+        puts "ERROR: More than one build difference. last: #{@percepts[:build_id]} new: #{new_id}"
+        @percepts[:build_id] = 'error'
       end
     end
     puts "#{@stage} #{@name} #{@percepts.inspect}".fg 'yellow'
