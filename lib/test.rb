@@ -48,6 +48,10 @@ class Test
         puts "Cloud #{@cloud_name} has threshold 0, moving to Done"
         @stage = Done
       else
+        unless @thresholds.key?(@cloudname)
+          puts "Cloud #{@cloudname} has no threshold, setting to defaul 5t"
+          @thresholds[@cloudname] = 5
+        end
         init_percepts
         if opts[:run_anyway] == false && @percepts[:job_status] == 'success'
           puts 'run_always flag is off, and test passsed, going straight to Done'.fg 'yellow'
