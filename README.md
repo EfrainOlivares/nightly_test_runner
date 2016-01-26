@@ -9,10 +9,37 @@
  * Jenkins should a matrix loaded for rightlinklite\_tests jobs
 
 
-## Setting up
+## The MONKEY_setup_nightly_automation_RL10 script above should have done the following:
  * Clone the repo to /root/nightly\_test\_runner
  * Run the setup.sh script
  * add your credentials to the .jenkins\_api\_client/login.yml and .right\_api\_client/login.yml
+
+## Basic operation overview of how the scipt works.
+At it's most basic level, the script that does the work starts with /root/nightly_test_runner/test_runner.rb.  This script
+uses lib/stage.rb and lib/test.rb.  It will roughly take the following steps.
+ * On startup, it will read the /root/.test_runner/options.yaml
+    *  jobs_file_location is a path to the config fila
+    *  prefix - This prefix should be present in all jenkins jobs and deployments the nightly runner will handle.
+    *  Thresholds: This is a hash of cloud names, each value is the number of deployments allowed to run at a given time.  (5 default)
+    *  run_anyway:  If this is set to true, it will rerun jenkins jobs with a passing result.  Otherwise it will skip them.
+
+## Actually running the script
+ * Create a text file containing the name of the jenkins jobs you want to run in job_file_location.
+ * Open the options file and set the approriate prefix, thresholds and run_anyway status.
+ * cd into /root/night_test_runner, and run bin/test_runner.rb
+
+## What does it actually do?
+It is easier to think of what it does for one job first.
+ * Check if job is runnable, (no deployment, job is stopped, destroyer is stopped).
+ * If it is runnable, run the job.
+ * If the job is successful, mark it done.
+ * If the job was a failure, run the destroyer and mark it done.
+
+It will do the above steps for every job on the list.  On the next level up it will...
+ * Iterate through the list of jobs and gather state information about deployment, jobs status.
+ * Take appropriate action for a job and move on to the next one.
+ The runner will pick up each job, check if it is runnable (no deployment, no jenkins job running, no destroyer running), and then run the job in jenkins.  If it does not match the requirement, it will take actions to remove the deployment, stop the jenkins job etc until it is r
+
 
 ## Running existing lists of jobs.
  * In the scripts folder, you'll find a couple of scripts to start nightly automation. The next section explains how they work.
