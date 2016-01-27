@@ -49,7 +49,7 @@ class Test
         @stage = Done
       else
         unless @thresholds.key?(@cloudname)
-          puts "Cloud #{@cloudname} has no threshold, setting to defaul 5t"
+          puts "Cloud #{@cloudname} has no threshold, setting to defaul 5"
           @thresholds[@cloudname] = 5
         end
         init_percepts
