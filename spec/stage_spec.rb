@@ -12,7 +12,7 @@ class TestInterface
     @action = nil
   end
 
-  %w(abort_job wait launch_destroyer).each do |method|
+  %w(abort_job wait launch_destroyer launch_if_cleared).each do |method|
     define_method(method) do
       @action_called = method
     end
@@ -89,5 +89,39 @@ describe 'Stage class behavior' do
         expect(@test_interface.action_called).to be_nil
       end
     end
+  end
+
+  context 'When a test job is ready to run, StageLaunch stage' do
+    before(:each) do
+      @test_interface = TestInterface.new
+      @test_interface.stage = StageLaunch 
+    end
+
+    it 'should launch the jenkins job IF there is no deployment, and build and destroyer are not running' do
+      test_data = [
+        Data.new({deployment: 'down', build: 'same', job_status: 'passed', destroyer_status: 'passed'}, StageLaunch),
+        Data.new({deployment: 'down', build: 'same', job_status: 'failed', destroyer_status: 'failed'}, StageLaunch),
+        Data.new({deployment: 'down', build: 'same', job_status: 'aborted', destroyer_status: 'failed'}, StageLaunch),
+      ]
+      test_data.each do |data|
+        StageLaunch.process(@test_interface, data.percept)
+        expect(@test_interface.stage).to eq(data.stage)
+        expect(@test_interface.action_called).to eq('launch_if_cleared')
+      end
+    end
+
+    it 'should transition to Running stage IF a new build is detected and job is running' do
+      test_data = [
+        Data.new({deployment: 'down', build: 'next', job_status: 'running', destroyer_status: 'passed'}, Running),
+        Data.new({deployment: 'down', build: 'next', job_status: 'running', destroyer_status: 'failed'}, Running),
+        Data.new({deployment: 'down', build: 'next', job_status: 'running', destroyer_status: 'aborted'}, Running),
+      ]
+      test_data.each do |data|
+        StageLaunch.process(@test_interface, data.percept)
+        expect(@test_interface.stage).to eq(data.stage)
+        expect(@test_interface.action_called).to be_nil 
+      end
+    end
+
   end
 end
